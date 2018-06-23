@@ -2,3 +2,4 @@
 ###########
 Pipfile.lock
 Pipfile
+.DS_Store
