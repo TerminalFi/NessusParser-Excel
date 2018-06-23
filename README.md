@@ -9,7 +9,7 @@ Python based nessus parser that converts a NessusV2 files into formatted XLSX do
 
 | Screen |
 | ---------------|
-| <img src="./screenshots/example.png" width="600"> |
+| <img src="./screenshots/Example.png" width="600"> |
 
 
 ## Pro's vs Con's
