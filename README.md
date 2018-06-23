@@ -1,6 +1,6 @@
 # NessusParser
 
-Python based nessus parser that converts a NessusV2 files into formatted XLSX documents.
+Python based nessus parser that converts NessusV2 files into formatted XLSX documents.
 
 # Key Features!
 
@@ -9,7 +9,7 @@ Python based nessus parser that converts a NessusV2 files into formatted XLSX do
 
 | Screen |
 | ---------------|
-| <img src="./screenshots/Example.png" width="600"> |
+| <img src="./screenshots/Example.png" width="100%"> |
 
 
 ## Pro's vs Con's
