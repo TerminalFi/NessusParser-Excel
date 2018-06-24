@@ -7,6 +7,10 @@ Python based nessus parser that converts NessusV2 files into formatted XLSX docu
   - Multiple file support
   - Formatted XLSX output with worksheets (Full Detail, Device Type, Critical, High, Medium, Low, Informational)
 
+#### Inspiration
+
+Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/archives/253). While this ruby one is still kicking, I prefer python. I hope to eventually emulate all of the features provide by this tool + more
+
 | Screen |
 | ---------------|
 | <img src="./screenshots/Example.png" width="100%"> |
