@@ -17,20 +17,17 @@ PARSER.add_argument('-o', '--output_file',
 ARGS = PARSER.parse_args()
 
 
-vuln_data = []
-host_data = []
-device_data = []
-cpe_data = []
-ms_process_info = []
-plugin_ids = []
-crit_data = []
-high_data = []
-med_data = []
-low_data = []
-info_data = []
-
-
-
+VULN_DATA = []
+HOST_DATA = []
+DEVICE_DATA = []
+CPE_DATA = []
+MS_PROCESS_INFO = []
+PLUGIN_IDS = []
+CRIT_DATA = []
+HIGH_DATA = []
+MED_DATA = []
+LOW_DATA = []
+INFO_DATA = []
 
 
 def get_child_value(currelem, getchild):
@@ -77,7 +74,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                         host_properties['host-fqdn'] = child.text
                     if child.get('name') in ['netbios-name'] and child.text is not None:
                         host_properties['netbios-name'] = child.text
-                host_data.append(host_properties.copy())
+                HOST_DATA.append(host_properties.copy())
 
             for child in elem.findall('ReportItem'):
                 # Process Info
@@ -93,7 +90,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                         'Process_Information.*', '', process_info).replace('\n\n\n', '')
 
                     process_properties['processes'] = process_info
-                    ms_process_info.append(process_properties.copy())
+                    MS_PROCESS_INFO.append(process_properties.copy())
 
                 # CPE Info
                 if child.find('cpe') is not None:
@@ -106,7 +103,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                         child, 'pluginName')
                     cpe_hash['cpe-source'] = get_attrib_value(child, 'vuln')
 
-                    cpe_data.append(cpe_hash.copy())
+                    CPE_DATA.append(cpe_hash.copy())
 
                 # CPE Info
                 if get_attrib_value(child, 'pluginID') in ['45590']:
@@ -131,7 +128,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                             cpe_hash[
                                 'cpe-source'] = get_attrib_value(child, 'cpe')
 
-                            cpe_data.append(cpe_hash.copy())
+                            CPE_DATA.append(cpe_hash.copy())
 
                 # Device Info
                 if get_attrib_value(child, 'pluginID') in ['54615']:
@@ -153,7 +150,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                             'Confidence level : (\d+)', device_info).group(1)
                     else:
                         device_properties['confidenceLevel'] = 0
-                    device_data.append(device_properties.copy())
+                    DEVICE_DATA.append(device_properties.copy())
                 # End
 
                 # WiFi Info
@@ -200,9 +197,8 @@ def parse_nessus_file(context, func, *args, **kwargs):
                 vuln_properties['plugin_modification_date'] = get_child_value(
                     child, 'plugin_modification_date')
 
-                vuln_data.append(vuln_properties.copy())
-            host_data.append(host_properties.copy())
-
+                VULN_DATA.append(vuln_properties.copy())
+            HOST_DATA.append(host_properties.copy())
             func(elem, *args, **kwargs)
             elem.clear()
             for ancestor in elem.xpath('ancestor-or-self::*'):
@@ -211,20 +207,20 @@ def parse_nessus_file(context, func, *args, **kwargs):
     del context
 
 
-def gen_severity_data(vuln_data):
-    for vuln in vuln_data:
+def gen_severity_data(VULN):
+    for vuln in VULN:
         if not vuln['severity']:
             continue
         if int(vuln['severity']) == 0:
-            crit_data.append(vuln.copy())
+            CRIT_DATA.append(vuln.copy())
         elif int(vuln['severity']) == 1:
-            high_data.append(vuln.copy())
+            HIGH_DATA.append(vuln.copy())
         elif int(vuln['severity']) == 2:
-            med_data.append(vuln.copy())
+            MED_DATA.append(vuln.copy())
         elif int(vuln['severity']) == 3:
-            low_data.append(vuln.copy())
+            LOW_DATA.append(vuln.copy())
         elif int(vuln['severity']) == 4:
-            info_data.append(vuln.copy())
+            INFO_DATA.append(vuln.copy())
 
 #############################################
 #############################################
@@ -233,9 +229,10 @@ def gen_severity_data(vuln_data):
 #############################################
 
 
-def add_ms_process_info(proc_Info, thefile):
+def add_ms_process_info(PROC_INFO, THE_FILE):
     temp_cnt = 2
-    ms_proc_ws = WORKBOOK.add_worksheet('MS Running Process Info')
+    ms_proc_ws = WB.add_worksheet('MS Running Process Info')
+    ms_proc_ws.set_tab_color("#9ec3ff")
 
     ms_proc_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
     ms_proc_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
@@ -253,20 +250,20 @@ def add_ms_process_info(proc_Info, thefile):
     ms_proc_ws.set_column('E:E', 25)
     ms_proc_ws.set_column('F:F', 80)
 
-    for host in proc_Info:
-        for proc in host['processes']:
+    for host in PROC_INFO:
+        for proc in host['processes'].split('\n'):
             ms_proc_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
-            # ms_proc_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 5, proc, WRAP_TEXT_FORMAT)
             temp_cnt += 1
 
 
-def add_device_type(device_Info, thefile):
+def add_device_type(DEVICE_INFO, THE_FILE):
     temp_cnt = 2
-    device_ws = WORKBOOK.add_worksheet('Device Type')
+    device_ws = WB.add_worksheet('Device Type')
 
     device_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
     device_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
@@ -286,9 +283,9 @@ def add_device_type(device_Info, thefile):
     device_ws.set_column('F:F', 15)
     device_ws.set_column('G:G', 15)
 
-    for host in device_Info:
+    for host in DEVICE_INFO:
         device_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         device_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
         device_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
         device_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
@@ -298,9 +295,9 @@ def add_device_type(device_Info, thefile):
         temp_cnt += 1
 
 
-def add_crit_info(crit_data, thefile):
+def add_crit_info(CRIT, THE_FILE):
     temp_cnt = 2
-    crit_ws = WORKBOOK.add_worksheet('Critical')
+    crit_ws = WB.add_worksheet('Critical')
     crit_ws.set_tab_color('red')
 
     crit_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -321,9 +318,9 @@ def add_crit_info(crit_data, thefile):
     crit_ws.set_column('F:F', 100)
     crit_ws.set_column('G:G', 15)
 
-    for crit in crit_data:
+    for crit in CRIT:
         crit_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        crit_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 2, crit['host-ip'], WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 3, crit[
                       'vuln_publication_date'], WRAP_TEXT_FORMAT)
@@ -333,9 +330,9 @@ def add_crit_info(crit_data, thefile):
         temp_cnt += 1
 
 
-def add_high_info(high_data, thefile):
+def add_high_info(HIGH, THE_FILE):
     temp_cnt = 2
-    high_ws = WORKBOOK.add_worksheet('High')
+    high_ws = WB.add_worksheet('High')
     high_ws.set_tab_color('orange')
 
     high_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -356,9 +353,9 @@ def add_high_info(high_data, thefile):
     high_ws.set_column('F:F', 100)
     high_ws.set_column('G:G', 15)
 
-    for high in high_data:
+    for high in HIGH:
         high_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        high_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 2, high['host-ip'], WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 3, high[
                       'vuln_publication_date'], WRAP_TEXT_FORMAT)
@@ -368,9 +365,9 @@ def add_high_info(high_data, thefile):
         temp_cnt += 1
 
 
-def add_med_info(med_data, thefile):
+def add_med_info(MED, THE_FILE):
     temp_cnt = 2
-    med_ws = WORKBOOK.add_worksheet('Medium')
+    med_ws = WB.add_worksheet('Medium')
     med_ws.set_tab_color('yellow')
 
     med_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -391,9 +388,9 @@ def add_med_info(med_data, thefile):
     med_ws.set_column('F:F', 100)
     med_ws.set_column('G:G', 15)
 
-    for med in med_data:
+    for med in MED:
         med_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        med_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 2, med['host-ip'], WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 3, med[
                      'vuln_publication_date'], WRAP_TEXT_FORMAT)
@@ -403,9 +400,9 @@ def add_med_info(med_data, thefile):
         temp_cnt += 1
 
 
-def add_low_info(low_data, thefile):
+def add_low_info(LOW, THE_FILE):
     temp_cnt = 2
-    low_ws = WORKBOOK.add_worksheet('Low')
+    low_ws = WB.add_worksheet('Low')
     low_ws.set_tab_color('green')
 
     low_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -426,21 +423,21 @@ def add_low_info(low_data, thefile):
     low_ws.set_column('F:F', 100)
     low_ws.set_column('G:G', 15)
 
-    for low in low_data:
+    for low in LOW:
         low_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        low_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 2, low['host-ip'], WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 3, low[
-                     'vuln_publication_date'], WRAP_TEXT_FORMAT)
+        	   'vuln_publication_date'], WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 4, int(low['pluginID']), WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 5, low['pluginName'], WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 6, low['exploit_available'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
 
 
-def add_info_info(info_data, thefile):
+def add_info_info(INFO, THE_FILE):
     temp_cnt = 2
-    info_ws = WORKBOOK.add_worksheet('Informational')
+    info_ws = WB.add_worksheet('Informational')
     info_ws.set_tab_color('blue')
 
     info_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -461,9 +458,9 @@ def add_info_info(info_data, thefile):
     info_ws.set_column('F:F', 100)
     info_ws.set_column('G:G', 15)
 
-    for info in info_data:
+    for info in INFO:
         info_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
+        info_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 2, info['host-ip'], WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 3, info[
                       'vuln_publication_date'], WRAP_TEXT_FORMAT)
@@ -473,9 +470,9 @@ def add_info_info(info_data, thefile):
         temp_cnt += 1
 
 
-def add_report_data(report_data_list, thefile):
+def add_report_data(REPORT_DATA_LIST, THE_FILE):
     temp_cnt = 2
-    report_ws = WORKBOOK.add_worksheet('Full Report')
+    report_ws = WB.add_worksheet('Full Report')
 
     report_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
     report_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
@@ -517,37 +514,41 @@ def add_report_data(report_data_list, thefile):
     report_ws.set_column('Q:Q', 25)
     report_ws.set_column('R:R', 25)
 
-    for reportitem in report_data_list:
+    for reportitem in REPORT_DATA_LIST:
         report_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 1, thefile, WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 2, reportitem['host-ip'], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 3, reportitem['host-fqdn'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 2, reportitem[
+        	   'host-ip'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 3, reportitem[
+        	   'host-fqdn'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 4, reportitem[
-                        "vuln_publication_date"], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 5,
-                        int(reportitem["severity"]), NUMBER_FORMAT)
+        	   "vuln_publication_date"], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 5, 
+        	   int(reportitem["severity"]), NUMBER_FORMAT)
         report_ws.write(temp_cnt, 6, reportitem[
-                        "risk_factor"], WRAP_TEXT_FORMAT)
+        	   "risk_factor"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 7,
-                        int(reportitem["pluginID"]), NUMBER_FORMAT)
+        	   int(reportitem["pluginID"]), NUMBER_FORMAT)
         report_ws.write(temp_cnt, 8, reportitem[
-                        "pluginFamily"], WRAP_TEXT_FORMAT)
+        	   "pluginFamily"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 9, reportitem[
-                        "pluginName"], WRAP_TEXT_FORMAT)
+        	   "pluginName"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 10, reportitem[
-                        "description"], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 11, reportitem['synopsis'], WRAP_TEXT_FORMAT)
+        	   "description"], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 11, reportitem[
+        	   'synopsis'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 12, reportitem[
-                        'plugin_output'], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 13, reportitem['solution'], WRAP_TEXT_FORMAT)
+        	   'plugin_output'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 13, reportitem[
+        	   'solution'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 14, reportitem[
-                        'exploit_available'], WRAP_TEXT_FORMAT)
+        	   'exploit_available'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 15, reportitem[
-                        'exploitability_ease'], WRAP_TEXT_FORMAT)
+        	   'exploitability_ease'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 16, reportitem[
-                        'plugin_publication_date'], WRAP_TEXT_FORMAT)
+        	   'plugin_publication_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 17, reportitem[
-                        'plugin_modification_date'], WRAP_TEXT_FORMAT)
+        	   'plugin_modification_date'], WRAP_TEXT_FORMAT)
 
         temp_cnt += 1
 
@@ -560,7 +561,7 @@ def add_report_data(report_data_list, thefile):
 
 def begin_parsing():
     for nessus_report in os.listdir(ARGS.launch_directory):
-        if nessus_report.endswith(".nessus"):
+        if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
             curr_file = os.path.join(ARGS.launch_directory, nessus_report)
             print("Found %s" % nessus_report)
 
@@ -568,7 +569,7 @@ def begin_parsing():
             context = iter(context)
             event, root = next(context)
 
-            if str(root.tag) in "NessusClientData_v2":
+            if root.tag in "NessusClientData_v2":
                 parse_nessus_file(context, lambda elem: None)
 
             del context
@@ -589,20 +590,21 @@ if __name__ == "__main__":
             sys.exit()
 
     begin_parsing()
-    WORKBOOK = xlsxwriter.Workbook(
+    WB = xlsxwriter.Workbook(
         '{0}.xlsx'.format(ARGS.output_file), {'strings_to_urls': False})
-    CENTER_BORDER_FORMAT = WORKBOOK.add_format(
+    CENTER_BORDER_FORMAT = WB.add_format(
         {'bold': True, 'italic': True, 'border': True})
-    WRAP_TEXT_FORMAT = WORKBOOK.add_format(
+    WRAP_TEXT_FORMAT = WB.add_format(
         {'bold': False, 'italic': False, 'border': True})
-    NUMBER_FORMAT = WORKBOOK.add_format(
+    NUMBER_FORMAT = WB.add_format(
         {'bold': False, 'italic': False, 'border': True, 'num_format': '0'})
-    gen_severity_data(vuln_data)
-    add_device_type(device_data, 'None')
-    add_report_data(vuln_data, 'None')
-    add_crit_info(crit_data, 'None')
-    add_high_info(high_data, 'None')
-    add_med_info(med_data, 'None')
-    add_low_info(low_data, 'None')
-    add_info_info(info_data, 'None')
-    WORKBOOK.close()
+    gen_severity_data(VULN_DATA)
+    add_device_type(DEVICE_DATA, 'None')
+    add_report_data(VULN_DATA, 'None')
+    add_crit_info(CRIT_DATA, 'None')
+    add_high_info(HIGH_DATA, 'None')
+    add_med_info(MED_DATA, 'None')
+    add_low_info(LOW_DATA, 'None')
+    add_info_info(INFO_DATA, 'None')
+    add_ms_process_info(MS_PROCESS_INFO, 'None')
+    WB.close()
