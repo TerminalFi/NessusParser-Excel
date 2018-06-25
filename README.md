@@ -9,13 +9,12 @@ Python based nessus parser that converts NessusV2 files into formatted XLSX docu
 
 ## Table of Contents
 
-  - [Inspiration](#Inspiration)
-  - [Planned Updates](#Planned-Updates)
-  - [Screen](#Screen)
-  - [Pro's vs Con's](#Pro's-vs-Con's)
-  - [Inspiration](#Inspiration)
-  - [Usage](#Usage)
-  - [Example](#Example)
+  - [Inspiration](#inspiration)
+  - [Planned Updates](#planned-updates)
+  - [Screen](#screen)
+  - [Pro's vs Con's](#pro's-vs-con's)
+  - [Usage](#usage)
+  - [Example](#example)
 
 
 
