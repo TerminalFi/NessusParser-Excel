@@ -7,7 +7,20 @@ Python based nessus parser that converts NessusV2 files into formatted XLSX docu
   - Multiple file support
   - Formatted XLSX output with worksheets (Full Detail, Device Type, Critical, High, Medium, Low, Informational)
 
-#### Inspiration
+## Table of Contents
+
+  - [Inspiration](#Inspiration)
+  - [Planned Updates](#Planned-Updates)
+  - [Screen](#Screen)
+  - [Pro's vs Con's](#Pro's-vs-Con's)
+  - [Inspiration](#Inspiration)
+  - [Usage](#Usage)
+  - [Example](#Example)
+
+
+
+
+### Inspiration
 
 Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/archives/253). While this ruby one is still kicking, I prefer python. I hope to eventually emulate all of the features provide by this tool + more
 
@@ -18,13 +31,14 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
  - Ignored Plugin ID's : Ignore ID's that are noisy, pointless, or other reasons
  - And more!
 
+#### Screen
 
-| Screen |
+| Full Report |
 | ---------------|
 | <img src="./screenshots/Example.png" width="100%"> |
 
 
-## Pro's vs Con's
+### Pro's vs Con's
 #### Pro's
   - Fast
   - Multi file support
@@ -36,7 +50,7 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
   - Memory usage (My MBP (16GB) handles 2GB worth of Nessus files without hiccup)
  
 
-## Usage
+### Usage
 
 ```
 pip install pipenv
@@ -47,7 +61,7 @@ pipenv shell
 python nessusparser.py -l FOLDER_WITH_FILES -o OUTPUT_DIRECTORY/FILENAME
 ```
 
-### Example
+#### Example
 
 ```
 Notice: No file extension specified
