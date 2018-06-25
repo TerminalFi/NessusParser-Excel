@@ -4,6 +4,7 @@ import os
 import sys
 import io
 import re
+from datetime import datetime, date
 import lxml.etree as ET
 import argparse
 import xlsxwriter
@@ -46,6 +47,7 @@ def is_match(regex, text):
 def return_match(regex, text):
     pattern = re.compile(regex)
     return pattern.search(text).group(1)
+
 
 def parse_nessus_file(context, func, *args, **kwargs):
     VULN_DATA = []
@@ -206,7 +208,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                 while ancestor.getprevious() is not None:
                     del ancestor.getparent()[0]
     del context
-    return VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS 
+    return VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS
 
 
 def gen_severity_data(VULN):
@@ -389,22 +391,23 @@ def generate_worksheets():
             WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
             WS.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
             WS.write(1, 4, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Severity', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Risk Factor', CENTER_BORDER_FORMAT)
-            WS.write(1, 7, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 8, 'Plugin Family', CENTER_BORDER_FORMAT)
-            WS.write(1, 9, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 10, 'Description', CENTER_BORDER_FORMAT)
-            WS.write(1, 11, 'Synopsis', CENTER_BORDER_FORMAT)
-            WS.write(1, 12, 'Plugin Output', CENTER_BORDER_FORMAT)
-            WS.write(1, 13, 'Solution', CENTER_BORDER_FORMAT)
-            WS.write(1, 14, 'Exploit Available', CENTER_BORDER_FORMAT)
-            WS.write(1, 15, 'Exploitability Ease', CENTER_BORDER_FORMAT)
-            WS.write(1, 16, 'Plugin Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 17, 'Plugin Modification Date', CENTER_BORDER_FORMAT)
+            WS.write(1, 5, 'Vuln Age by Days', CENTER_BORDER_FORMAT)
+            WS.write(1, 6, 'Severity', CENTER_BORDER_FORMAT)
+            WS.write(1, 7, 'Risk Factor', CENTER_BORDER_FORMAT)
+            WS.write(1, 8, 'Plugin ID', CENTER_BORDER_FORMAT)
+            WS.write(1, 9, 'Plugin Family', CENTER_BORDER_FORMAT)
+            WS.write(1, 10, 'Plugin Name', CENTER_BORDER_FORMAT)
+            WS.write(1, 11, 'Description', CENTER_BORDER_FORMAT)
+            WS.write(1, 12, 'Synopsis', CENTER_BORDER_FORMAT)
+            WS.write(1, 13, 'Plugin Output', CENTER_BORDER_FORMAT)
+            WS.write(1, 14, 'Solution', CENTER_BORDER_FORMAT)
+            WS.write(1, 15, 'Exploit Available', CENTER_BORDER_FORMAT)
+            WS.write(1, 16, 'Exploitability Ease', CENTER_BORDER_FORMAT)
+            WS.write(1, 17, 'Plugin Publication Date', CENTER_BORDER_FORMAT)
+            WS.write(1, 18, 'Plugin Modification Date', CENTER_BORDER_FORMAT)
 
             WS.freeze_panes('C3')
-            WS.autofilter('A2:M2')
+            WS.autofilter('A2:S2')
             WS.set_column('A:A', 10)
             WS.set_column('B:B', 35)
             WS.set_column('C:C', 15)
@@ -414,8 +417,8 @@ def generate_worksheets():
             WS.set_column('G:G', 15)
             WS.set_column('H:H', 15)
             WS.set_column('I:I', 25)
-            WS.set_column('J:J', 100)
-            WS.set_column('K:K', 25)
+            WS.set_column('J:J', 25)
+            WS.set_column('K:K', 100)
             WS.set_column('L:L', 25)
             WS.set_column('M:M', 25)
             WS.set_column('N:N', 25)
@@ -423,6 +426,7 @@ def generate_worksheets():
             WS.set_column('P:P', 25)
             WS.set_column('Q:Q', 25)
             WS.set_column('R:R', 25)
+            WS.set_column('S:S', 25)
     WS = None
 
 
@@ -541,7 +545,20 @@ def add_info_info(INFO, THE_FILE):
 def add_report_data(REPORT_DATA_LIST, THE_FILE):
     report_ws = WS_MAPPER['Full Report']
     temp_cnt = ROW_TRACKER['Full Report']
+
     for reportitem in REPORT_DATA_LIST:
+        if reportitem["vuln_publication_date"] != '':
+            date_Format = "%Y/%m/%d"
+            date_One = datetime.strptime(
+                reportitem["vuln_publication_date"], date_Format)
+            date_Two = datetime.strptime(
+                str(date.today()).replace("-", "/"), date_Format)
+            report_ws.write(temp_cnt, 5,
+                            (date_One - date_Two).days, NUMBER_FORMAT)
+        else:
+            report_ws.write(temp_cnt, 5,
+                            reportitem["vuln_publication_date"], NUMBER_FORMAT)
+
         report_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 2, reportitem[
@@ -550,31 +567,31 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
             'host-fqdn'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 4, reportitem[
             "vuln_publication_date"], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 5,
+        report_ws.write(temp_cnt, 6,
                         int(reportitem["severity"]), NUMBER_FORMAT)
-        report_ws.write(temp_cnt, 6, reportitem[
+        report_ws.write(temp_cnt, 7, reportitem[
             "risk_factor"], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 7,
+        report_ws.write(temp_cnt, 8,
                         int(reportitem["pluginID"]), NUMBER_FORMAT)
-        report_ws.write(temp_cnt, 8, reportitem[
-            "pluginFamily"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 9, reportitem[
-            "pluginName"], WRAP_TEXT_FORMAT)
+            "pluginFamily"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 10, reportitem[
-            "description"], WRAP_TEXT_FORMAT)
+            "pluginName"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 11, reportitem[
-            'synopsis'], WRAP_TEXT_FORMAT)
+            "description"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 12, reportitem[
-            'plugin_output'], WRAP_TEXT_FORMAT)
+            'synopsis'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 13, reportitem[
-            'solution'], WRAP_TEXT_FORMAT)
+            'plugin_output'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 14, reportitem[
-            'exploit_available'], WRAP_TEXT_FORMAT)
+            'solution'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 15, reportitem[
-            'exploitability_ease'], WRAP_TEXT_FORMAT)
+            'exploit_available'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 16, reportitem[
-            'plugin_publication_date'], WRAP_TEXT_FORMAT)
+            'exploitability_ease'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 17, reportitem[
+            'plugin_publication_date'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 18, reportitem[
             'plugin_modification_date'], WRAP_TEXT_FORMAT)
 
         temp_cnt += 1
@@ -628,7 +645,7 @@ if __name__ == "__main__":
             sys.exit()
 
     WB = xlsxwriter.Workbook(
-        '{0}.xlsx'.format(ARGS.output_file), {'strings_to_urls': False})
+        '{0}.xlsx'.format(ARGS.output_file), {'strings_to_urls': False, 'constant_memory': True})
     CENTER_BORDER_FORMAT = WB.add_format(
         {'bold': True, 'italic': True, 'border': True})
     WRAP_TEXT_FORMAT = WB.add_format(
