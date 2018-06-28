@@ -36,6 +36,12 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 ##### Version 0.3.1
 
  - Code refractoring
+ - Added BugTraq ID's column to Full Report, Critical, High, Medium, Low, Informational
+
+
+##### Version 0.3.1
+
+ - Code refractoring
  - Added CVE Information to correlating findings. (Last column of worksheets)
 
 

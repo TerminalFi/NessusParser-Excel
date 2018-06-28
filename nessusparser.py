@@ -16,11 +16,16 @@ PARSER.add_argument('-o', '--output_file',
                     help="Filename to save results as", required=True)
 ARGS = PARSER.parse_args()
 
-
 # Track created worksheets
 WS_MAPPER = dict()
 # Track current used row for worksheets
 ROW_TRACKER = dict()
+
+SEVERITIES = {0: "Informational",
+              1: "Low",
+              2: "Medium",
+              3: "High",
+              4: "Critical"}
 
 SINGLE_FIELDS = ['risk_factor', 'vuln_publication_date', 'description',
                  'plugin_output', 'solution', 'synopsis',
@@ -90,7 +95,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                     for cve in child.iter("cve"):
                         CVE_ITEM_LIST.append(cve.text)
 
-                # MS Builiten Per Item
+                # Bugtraq ID Per Item
                 BID_ITEM_LIST = list()
                 if child.find("bid") is not None:
                     for bid in child.iter("bid"):
@@ -197,7 +202,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
                 for field in ATTRIB_FIELDS:
                     vuln_properties[field] = get_attrib_value(
                         child, field)
-                vuln_properties['bid'] = ";\n".join(CVE_ITEM_LIST)
+                vuln_properties['bid'] = ";\n".join(BID_ITEM_LIST)
                 vuln_properties['cve'] = ";\n".join(CVE_ITEM_LIST)
 
                 VULN_DATA.append(vuln_properties.copy())
@@ -250,6 +255,7 @@ def generate_worksheets():
             WS.write(1, 17, 'Plugin Publication Date', CENTER_BORDER_FORMAT)
             WS.write(1, 18, 'Plugin Modification Date', CENTER_BORDER_FORMAT)
             WS.write(1, 19, 'CVE Information', CENTER_BORDER_FORMAT)
+            WS.write(1, 20, 'Bugtraq ID Information', CENTER_BORDER_FORMAT)
 
             WS.freeze_panes('C3')
             WS.autofilter('A2:T2')
@@ -273,6 +279,7 @@ def generate_worksheets():
             WS.set_column('R:R', 25)
             WS.set_column('S:S', 25)
             WS.set_column('T:T', 25)
+            WS.set_column('U:U', 25)
             continue
         if sheet == 'MS Running Process Info':
             WS.set_tab_color("#9EC3FF")
@@ -331,6 +338,7 @@ def generate_worksheets():
         WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
         WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
         WS.write(1, 7, 'CVE Information', CENTER_BORDER_FORMAT)
+        WS.write(1, 8, 'Bugtraq ID Information', CENTER_BORDER_FORMAT)
 
         WS.freeze_panes('C3')
         WS.autofilter('A2:E2')
@@ -342,6 +350,7 @@ def generate_worksheets():
         WS.set_column('F:F', 100)
         WS.set_column('G:G', 15)
         WS.set_column('H:H', 25)
+        WS.set_column('I:I', 25)
 
     WS = None
 
@@ -373,104 +382,31 @@ def add_device_type(DEVICE_INFO, THE_FILE):
         device_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
         device_ws.write(temp_cnt, 5, host['type'], WRAP_TEXT_FORMAT)
         device_ws.write(temp_cnt, 6, int(
-            host['confidenceLevel']), WRAP_TEXT_FORMAT)
+            host['confidenceLevel']), NUMBER_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['Device Type'] = temp_cnt
 
 
-def add_crit_info(CRIT, THE_FILE):
-    crit_ws = WS_MAPPER['Critical']
-    temp_cnt = ROW_TRACKER['Critical']
-    for crit in CRIT:
-        if not int(crit['severity']) == 4:
-            continue
-        crit_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 2, crit['host-ip'], WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 3, crit[
-                      'vuln_publication_date'], WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 4, int(crit['pluginID']), WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 5, crit['pluginName'], WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 6, crit['exploit_available'], WRAP_TEXT_FORMAT)
-        crit_ws.write(temp_cnt, 6, crit['cve'], WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Critical'] = temp_cnt
-
-
-def add_high_info(HIGH, THE_FILE):
-    high_ws = WS_MAPPER['High']
-    temp_cnt = ROW_TRACKER['High']
-    for high in HIGH:
-        if not int(high['severity']) == 3:
-            continue
-        high_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 2, high['host-ip'], WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 3, high[
-                      'vuln_publication_date'], WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 4, int(high['pluginID']), WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 5, high['pluginName'], WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 6, high['exploit_available'], WRAP_TEXT_FORMAT)
-        high_ws.write(temp_cnt, 7, high['cve'], WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['High'] = temp_cnt
-
-
-def add_med_info(MED, THE_FILE):
-    med_ws = WS_MAPPER['Medium']
-    temp_cnt = ROW_TRACKER['Medium']
-    for med in MED:
-        if not int(med['severity']) == 2:
-            continue
-        med_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 2, med['host-ip'], WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 3, med[
-                     'vuln_publication_date'], WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 4, int(med['pluginID']), WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 5, med['pluginName'], WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 6, med['exploit_available'], WRAP_TEXT_FORMAT)
-        med_ws.write(temp_cnt, 7, med['cve'], WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Medium'] = temp_cnt
-
-
-def add_low_info(LOW, THE_FILE):
-    low_ws = WS_MAPPER['Low']
-    temp_cnt = ROW_TRACKER['Low']
-    for low in LOW:
-        if not int(low['severity']) == 1:
-            continue
-        low_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 2, low['host-ip'], WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 3, low[
-            'vuln_publication_date'], WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 4, int(low['pluginID']), WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 5, low['pluginName'], WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 6, low['exploit_available'], WRAP_TEXT_FORMAT)
-        low_ws.write(temp_cnt, 7, low['cve'], WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Low'] = temp_cnt
-
-
-def add_info_info(INFO, THE_FILE):
-    info_ws = WS_MAPPER['Informational']
-    temp_cnt = ROW_TRACKER['Informational']
-    for info in INFO:
-        if not int(info['severity']) == 0:
-            continue
-        info_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 2, info['host-ip'], WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 3, info[
-                      'vuln_publication_date'], WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 4, int(info['pluginID']), WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 5, info['pluginName'], WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 6, info['exploit_available'], WRAP_TEXT_FORMAT)
-        info_ws.write(temp_cnt, 7, info['cve'], WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Informational'] = temp_cnt
+def add_vuln_info(VULN_LIST, THE_FILE):
+    for key, value in SEVERITIES.items():
+        vuln_ws = WS_MAPPER[value]
+        temp_cnt = ROW_TRACKER[value]
+        for vuln in VULN_LIST:
+            if not int(vuln['severity']) == key:
+                continue
+            vuln_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 2, vuln['host-ip'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 3, vuln[
+                'vuln_publication_date'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 4, int(vuln['pluginID']), NUMBER_FORMAT)
+            vuln_ws.write(temp_cnt, 5, vuln['pluginName'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 6, vuln[
+                'exploit_available'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 7, vuln['cve'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 8, vuln['bid'], WRAP_TEXT_FORMAT)
+            temp_cnt += 1
+        ROW_TRACKER[value] = temp_cnt
 
 
 def add_report_data(REPORT_DATA_LIST, THE_FILE):
@@ -534,6 +470,8 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
             'plugin_modification_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 19, reportitem[
             'cve'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 20, reportitem[
+            'bid'], WRAP_TEXT_FORMAT)
 
         temp_cnt += 1
     # Save the last unused row for use on the next Nessus file
@@ -565,11 +503,7 @@ def begin_parsing():
                     context, lambda elem: None)
                 add_report_data(VULN_DATA, curr_file)
                 add_device_type(DEVICE_DATA, curr_file)
-                add_crit_info(VULN_DATA, curr_file)
-                add_high_info(VULN_DATA, curr_file)
-                add_med_info(VULN_DATA, curr_file)
-                add_low_info(VULN_DATA, curr_file)
-                add_info_info(VULN_DATA, curr_file)
+                add_vuln_info(VULN_DATA, curr_file)
                 add_ms_process_info(MS_PROCESS_INFO, curr_file)
 
             del context
