@@ -1,4 +1,6 @@
 #!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
 
 import os
 import sys
@@ -7,6 +9,32 @@ from datetime import datetime, date
 import argparse
 import lxml.etree as ET
 import xlsxwriter
+
+__author__ = "TheSecEng"
+__website__ = "https:\\\\seceng.io | https:\\\\terminalconnection.io"
+__copyright__ = "Copyright 2018, TheSecEng"
+__credits__ = ["TheSecEng"]
+__license__ = "GPL"
+__version__ = "0.3.2"
+__maintainer__ = "TheSecEng"
+__email__ = "Nope"
+__status__ = "Development"
+
+
+SCRIPT_INFO = \
+    """
+NessusParser-Excel v.{0}
+
+Created and maintained by {1} ({2})
+Inspiration from Nessus Parser by Cody (http://www.melcara.com) 
+
+Latest Updates
+    - Optimized Memory Usage: Max File Size * 2 + 40 ...ish
+    - Creation of Chart data
+    - Inclusion of BugTraq and CVE ID's
+""".format(__version__,
+           __author__,
+           __website__)
 
 
 PARSER = argparse.ArgumentParser(description='Parse Nessus Files')
@@ -34,6 +62,12 @@ SINGLE_FIELDS = ['risk_factor', 'vuln_publication_date', 'description',
 
 ATTRIB_FIELDS = ['severity', 'pluginFamily', 'pluginID',
                  'pluginName']
+
+SEVERITY_TOTALS = {"Informational": 0,
+                   "Low": 0,
+                   "Medium": 0,
+                   "High": 0,
+                   "Critical": 0}
 
 
 def get_child_value(currelem, getchild):
@@ -226,14 +260,23 @@ def generate_worksheets():
     """
         Generate worksheets and store them for later use
     """
-    WS_NAMES = ["Full Report", "Device Type",
+    print("Generating the worksheets")
+    WS_NAMES = ["Overview", "Full Report", "Device Type",
                 "Critical", "High",
                 "Medium", "Low",
-                "Informational", "MS Running Process Info"]
+                "Informational", "MS Running Process Info",
+                "Graph Data"]
     for sheet in WS_NAMES:
+        print("\tCreating {0} worksheet".format(sheet))
         WS_MAPPER[sheet] = WB.add_worksheet(sheet)
         ROW_TRACKER[sheet] = 2
         WS = WS_MAPPER[sheet]
+        if sheet == "Overview":
+            continue
+        if sheet == "Graph Data":
+            WS.write(1, 0, 'Severity', CENTER_BORDER_FORMAT)
+            WS.write(1, 1, 'Total', CENTER_BORDER_FORMAT)
+            continue
         if sheet == "Full Report":
             WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
             WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
@@ -355,7 +398,47 @@ def generate_worksheets():
     WS = None
 
 
+def add_chart_data(DATA):
+    print("\tGenerating Vulnerabilities by Severity graph")
+    ws = WS_MAPPER["Graph Data"]
+    temp_cnt = 2
+    for key, value in SEVERITY_TOTALS.items():
+        ws.write(temp_cnt, 0, key)
+        ws.write(temp_cnt, 1, value)
+        temp_cnt += 1
+    ws.hide()
+    ws = WS_MAPPER["Overview"]
+    severity_chart = WB.add_chart({'type': 'pie'})
+
+    # Configure Chart Data
+    # Break down for range [SHEETNAME, START ROW-Header, COLUMN, END ROW, END
+    # COLUMN]
+    severity_chart.set_size({'width': 624, 'height': 480})
+    severity_chart.add_series({
+        'name':       'Total Vulnerabilities',
+        'data_labels': {'value': 1},
+        'categories': ["Graph Data", 2, 0, 6, 0],
+        'values':     ["Graph Data", 2, 1, 6, 1],
+        'points': [
+            {'fill': {'color': '#618ECD'}},
+            {'fill': {'color': '#58BF65'}},
+            {'fill': {'color': '#F7F552'}},
+            {'fill': {'color': '#E9A23A'}},
+            {'fill': {'color': '#B8504B'}},
+        ]
+    })
+    severity_chart.set_title({'name': 'Vulnerabilities by Severity'})
+    severity_chart.set_legend({'font': {'size': 14}})
+
+    # Set an Excel chart style. Colors with white outline and shadow.
+    severity_chart.set_style(10)
+
+    # Insert the chart into the worksheet (with an offset).
+    ws.insert_chart('A2', severity_chart, {'x_offset': 25, 'y_offset': 10})
+
+
 def add_ms_process_info(PROC_INFO, THE_FILE):
+    print("\tInserting data into MS Process Info worksheet")
     ms_proc_ws = WS_MAPPER['MS Running Process Info']
     temp_cnt = ROW_TRACKER['MS Running Process Info']
     for host in PROC_INFO:
@@ -372,6 +455,7 @@ def add_ms_process_info(PROC_INFO, THE_FILE):
 
 
 def add_device_type(DEVICE_INFO, THE_FILE):
+    print("\tInserting data into Device Type worksheet")
     device_ws = WS_MAPPER['Device Type']
     temp_cnt = ROW_TRACKER['Device Type']
     for host in DEVICE_INFO:
@@ -389,11 +473,13 @@ def add_device_type(DEVICE_INFO, THE_FILE):
 
 def add_vuln_info(VULN_LIST, THE_FILE):
     for key, value in SEVERITIES.items():
+        print("\tInserting data into {0} worksheet".format(value))
         vuln_ws = WS_MAPPER[value]
         temp_cnt = ROW_TRACKER[value]
         for vuln in VULN_LIST:
             if not int(vuln['severity']) == key:
                 continue
+            SEVERITY_TOTALS[value] += 1
             vuln_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
             vuln_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
             vuln_ws.write(temp_cnt, 2, vuln['host-ip'], WRAP_TEXT_FORMAT)
@@ -414,6 +500,7 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
         Function responsible for inserting data into the Full Report
         worksheet
     """
+    print("\tInserting data into Full Report worksheet")
     # Retrieve correct worksheet from out Worksheet tracker
     report_ws = WS_MAPPER['Full Report']
     # Resume inserting rows at our last unused row
@@ -490,6 +577,13 @@ def begin_parsing():
         is for a Nessus v2 File. Initiates parsing and then writes to
         the associated workbook sheets.
     """
+    MAX_EXPECTED_MEMORY_USAGE = 0
+    for nessus_report in os.listdir(ARGS.launch_directory):
+        if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
+            FILE_SIZE = (os.path.getsize(os.path.join(ARGS.launch_directory, nessus_report)) >> 20) * 2
+            if FILE_SIZE > MAX_EXPECTED_MEMORY_USAGE:
+                MAX_EXPECTED_MEMORY_USAGE = FILE_SIZE
+    print("\nMax expected memory usage {0} MB".format(MAX_EXPECTED_MEMORY_USAGE))
     for nessus_report in os.listdir(ARGS.launch_directory):
         if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
             curr_file = os.path.join(ARGS.launch_directory, nessus_report)
@@ -498,7 +592,7 @@ def begin_parsing():
             event, root = next(context)
 
             if root.tag in "NessusClientData_v2":
-                print("Beginning parsing of {0}".format(nessus_report))
+                print("\nBegin parsing of {0}".format(nessus_report))
                 VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
                     context, lambda elem: None)
                 add_report_data(VULN_DATA, curr_file)
@@ -507,9 +601,11 @@ def begin_parsing():
                 add_ms_process_info(MS_PROCESS_INFO, curr_file)
 
             del context
+    add_chart_data(SEVERITY_TOTALS)
 
 
 if __name__ == "__main__":
+    print(SCRIPT_INFO)
 
     FILE_COUNT = len([name for name in os.listdir(
         ARGS.launch_directory) if name.endswith('.nessus')])
