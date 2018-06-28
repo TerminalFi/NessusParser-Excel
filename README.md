@@ -33,7 +33,7 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Updates
 
-##### Version 0.3.1
+##### Version 0.3.2
 
  - Code refractoring
  - Added BugTraq ID's column to Full Report, Critical, High, Medium, Low, Informational
