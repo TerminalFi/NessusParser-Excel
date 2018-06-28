@@ -612,7 +612,7 @@ def begin_parsing():
         context = iter(context)
         event, root = next(context)
 
-        if root.tag in "NessusClientData_v2":
+        if root.tag in ["NessusClientData_v2"]:
             ColorPrint.print_pass("\nBegin parsing of {0}".format(nessus_report))
             VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
                 context, lambda elem: None)
