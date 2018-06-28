@@ -15,7 +15,7 @@ __website__ = "https:\\\\seceng.io | https:\\\\terminalconnection.io"
 __copyright__ = "Copyright 2018, TheSecEng"
 __credits__ = ["TheSecEng"]
 __license__ = "GPL"
-__version__ = "0.3.2"
+__version__ = "0.3.3"
 __maintainer__ = "TheSecEng"
 __email__ = "Nope"
 __status__ = "Development"
@@ -26,10 +26,11 @@ SCRIPT_INFO = \
 NessusParser-Excel v.{0}
 
 Created and maintained by {1} ({2})
-Inspiration from Nessus Parser by Cody (http://www.melcara.com) 
+Inspiration from Nessus Parser by Cody (http://www.melcara.com)
 
 Latest Updates
-    - Optimized Memory Usage: Max File Size * 2 + 40 ...ish
+    - Optimized Memory Usage
+    - Memory Usage expectency calculation
     - Creation of Chart data
     - Inclusion of BugTraq and CVE ID's
 """.format(__version__,
@@ -43,6 +44,35 @@ PARSER.add_argument('-l', '--launch_directory',
 PARSER.add_argument('-o', '--output_file',
                     help="Filename to save results as", required=True)
 ARGS = PARSER.parse_args()
+
+# Discovered at https://stackoverflow.com/questions/39473297/how-do-i-print-colored-output-with-python-3
+# By Nicholas Stommel
+
+
+class ColorPrint:
+
+    @staticmethod
+    def print_fail(message, end='\n'):
+        sys.stderr.write('\x1b[1;31m' + message + '\x1b[0m' + end)
+
+    @staticmethod
+    def print_pass(message, end='\n'):
+        sys.stdout.write('\x1b[1;32m' + message + '\x1b[0m' + end)
+
+    @staticmethod
+    def print_warn(message, end='\n'):
+        sys.stderr.write('\x1b[1;33m' + message + '\x1b[0m' + end)
+
+    @staticmethod
+    def print_info(message, end='\n'):
+        sys.stdout.write('\x1b[1;34m' + message + '\x1b[0m' + end)
+
+    @staticmethod
+    def print_bold(message, end='\n'):
+        sys.stdout.write('\x1b[1;37m' + message + '\x1b[0m' + end)
+
+
+TO_BE_PARSED = list()
 
 # Track created worksheets
 WS_MAPPER = dict()
@@ -260,14 +290,14 @@ def generate_worksheets():
     """
         Generate worksheets and store them for later use
     """
-    print("Generating the worksheets")
+    ColorPrint.print_pass("Generating the worksheets")
     WS_NAMES = ["Overview", "Full Report", "Device Type",
                 "Critical", "High",
                 "Medium", "Low",
                 "Informational", "MS Running Process Info",
                 "Graph Data"]
     for sheet in WS_NAMES:
-        print("\tCreating {0} worksheet".format(sheet))
+        ColorPrint.print_bold("\tCreating {0} worksheet".format(sheet))
         WS_MAPPER[sheet] = WB.add_worksheet(sheet)
         ROW_TRACKER[sheet] = 2
         WS = WS_MAPPER[sheet]
@@ -399,10 +429,10 @@ def generate_worksheets():
 
 
 def add_chart_data(DATA):
-    print("\tGenerating Vulnerabilities by Severity graph")
+    ColorPrint.print_warn("\nGenerating Vulnerabilities by Severity graph")
     ws = WS_MAPPER["Graph Data"]
     temp_cnt = 2
-    for key, value in SEVERITY_TOTALS.items():
+    for key, value in DATA.items():
         ws.write(temp_cnt, 0, key)
         ws.write(temp_cnt, 1, value)
         temp_cnt += 1
@@ -438,7 +468,7 @@ def add_chart_data(DATA):
 
 
 def add_ms_process_info(PROC_INFO, THE_FILE):
-    print("\tInserting data into MS Process Info worksheet")
+    ColorPrint.print_bold("\tInserting data into MS Process Info worksheet")
     ms_proc_ws = WS_MAPPER['MS Running Process Info']
     temp_cnt = ROW_TRACKER['MS Running Process Info']
     for host in PROC_INFO:
@@ -455,7 +485,7 @@ def add_ms_process_info(PROC_INFO, THE_FILE):
 
 
 def add_device_type(DEVICE_INFO, THE_FILE):
-    print("\tInserting data into Device Type worksheet")
+    ColorPrint.print_bold("\tInserting data into Device Type worksheet")
     device_ws = WS_MAPPER['Device Type']
     temp_cnt = ROW_TRACKER['Device Type']
     for host in DEVICE_INFO:
@@ -473,7 +503,7 @@ def add_device_type(DEVICE_INFO, THE_FILE):
 
 def add_vuln_info(VULN_LIST, THE_FILE):
     for key, value in SEVERITIES.items():
-        print("\tInserting data into {0} worksheet".format(value))
+        ColorPrint.print_bold("\tInserting data into {0} worksheet".format(value))
         vuln_ws = WS_MAPPER[value]
         temp_cnt = ROW_TRACKER[value]
         for vuln in VULN_LIST:
@@ -500,7 +530,7 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
         Function responsible for inserting data into the Full Report
         worksheet
     """
-    print("\tInserting data into Full Report worksheet")
+    ColorPrint.print_bold("\tInserting data into Full Report worksheet")
     # Retrieve correct worksheet from out Worksheet tracker
     report_ws = WS_MAPPER['Full Report']
     # Resume inserting rows at our last unused row
@@ -577,35 +607,26 @@ def begin_parsing():
         is for a Nessus v2 File. Initiates parsing and then writes to
         the associated workbook sheets.
     """
-    MAX_EXPECTED_MEMORY_USAGE = 0
-    for nessus_report in os.listdir(ARGS.launch_directory):
-        if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
-            FILE_SIZE = (os.path.getsize(os.path.join(ARGS.launch_directory, nessus_report)) >> 20) * 2
-            if FILE_SIZE > MAX_EXPECTED_MEMORY_USAGE:
-                MAX_EXPECTED_MEMORY_USAGE = FILE_SIZE
-    print("\nMax expected memory usage {0} MB".format(MAX_EXPECTED_MEMORY_USAGE))
-    for nessus_report in os.listdir(ARGS.launch_directory):
-        if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
-            curr_file = os.path.join(ARGS.launch_directory, nessus_report)
-            context = ET.iterparse(curr_file, events=('start', 'end', ))
-            context = iter(context)
-            event, root = next(context)
+    for nessus_report in TO_BE_PARSED:
+        context = ET.iterparse(nessus_report, events=('start', 'end', ))
+        context = iter(context)
+        event, root = next(context)
 
-            if root.tag in "NessusClientData_v2":
-                print("\nBegin parsing of {0}".format(nessus_report))
-                VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
-                    context, lambda elem: None)
-                add_report_data(VULN_DATA, curr_file)
-                add_device_type(DEVICE_DATA, curr_file)
-                add_vuln_info(VULN_DATA, curr_file)
-                add_ms_process_info(MS_PROCESS_INFO, curr_file)
+        if root.tag in "NessusClientData_v2":
+            ColorPrint.print_pass("\nBegin parsing of {0}".format(nessus_report))
+            VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
+                context, lambda elem: None)
+            add_report_data(VULN_DATA, nessus_report)
+            add_device_type(DEVICE_DATA, nessus_report)
+            add_vuln_info(VULN_DATA, nessus_report)
+            add_ms_process_info(MS_PROCESS_INFO, nessus_report)
 
-            del context
+        del context
     add_chart_data(SEVERITY_TOTALS)
 
 
 if __name__ == "__main__":
-    print(SCRIPT_INFO)
+    ColorPrint.print_bold(SCRIPT_INFO)
 
     FILE_COUNT = len([name for name in os.listdir(
         ARGS.launch_directory) if name.endswith('.nessus')])
@@ -630,5 +651,18 @@ if __name__ == "__main__":
         {'border': True, 'num_format': '0'})
 
     generate_worksheets()
+
+    MAX_EXPECTED_MEMORY_USAGE = 0
+    for nessus_report in os.listdir(ARGS.launch_directory):
+        if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
+            TO_BE_PARSED.append(os.path.join(
+                ARGS.launch_directory, nessus_report))
+            FILE_SIZE = (os.path.getsize(
+                TO_BE_PARSED[-1]) >> 20) * 2
+            if FILE_SIZE > MAX_EXPECTED_MEMORY_USAGE:
+                MAX_EXPECTED_MEMORY_USAGE = FILE_SIZE
+
+    ColorPrint.print_warn(
+        "\n*** Max expected memory usage {0} MB ***".format(MAX_EXPECTED_MEMORY_USAGE))
     begin_parsing()
     WB.close()
