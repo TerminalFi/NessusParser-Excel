@@ -33,6 +33,12 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Updates
 
+##### Version 0.3.3
+
+ - Memory Optimization
+ - Max memory usage expectency calculation
+ - Overview sheet includes Pie chart of Vuln Count by Severities
+
 ##### Version 0.3.2
 
  - Code refractoring
