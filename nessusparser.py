@@ -50,7 +50,9 @@ ARGS = PARSER.parse_args()
 
 
 class ColorPrint:
-
+    """
+        Color printing class
+    """
     @staticmethod
     def print_fail(message, end='\n'):
         sys.stderr.write('\x1b[1;31m' + message + '\x1b[0m' + end)
@@ -71,33 +73,46 @@ class ColorPrint:
     def print_bold(message, end='\n'):
         sys.stdout.write('\x1b[1;37m' + message + '\x1b[0m' + end)
 
-
+# List of Nessus files for parsing
 TO_BE_PARSED = list()
-
 # Track created worksheets
 WS_MAPPER = dict()
 # Track current used row for worksheets
 ROW_TRACKER = dict()
-
-SEVERITIES = {0: "Informational",
-              1: "Low",
-              2: "Medium",
-              3: "High",
-              4: "Critical"}
 
 SINGLE_FIELDS = ['risk_factor', 'vuln_publication_date', 'description',
                  'plugin_output', 'solution', 'synopsis',
                  'exploit_available', 'exploitability_ease', 'exploited_by_malware',
                  'plugin_publication_date', 'plugin_modification_date']
 
-ATTRIB_FIELDS = ['severity', 'pluginFamily', 'pluginID',
-                 'pluginName']
+ATTRIB_FIELDS = ['severity', 'pluginFamily', 'pluginID', 'pluginName']
 
+SEVERITIES = {0: "Informational",
+              1: "Low",
+              2: "Medium",
+              3: "High",
+              4: "Critical"}
 SEVERITY_TOTALS = {"Informational": 0,
                    "Low": 0,
                    "Medium": 0,
                    "High": 0,
                    "Critical": 0}
+COUNT_UNIQUE_SEVERITIES = {0: 0,
+                           1: 0,
+                           2: 0,
+                           3: 0,
+                           4: 0}
+#max(stats, key=lambda key: stats[key][1])
+UNIQUE_PLUGIN_NAME = dict()
+
+COMMON_CRIT = dict()
+COMMON_HIGH = dict()
+COMMON_MED = dict()
+COMMON_LOW = dict()
+COMMON_INFO = dict()
+
+COUNT_IP_SEEN = 0
+UNIQUE_IP_LIST = list()
 
 
 def get_child_value(currelem, getchild):
@@ -129,6 +144,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
     CPE_DATA = []
     MS_PROCESS_INFO = []
     PLUGIN_IDS = []
+    global COUNT_IP_SEEN
     start_tag = None
     for event, elem in context:
         host_properties = {}
@@ -152,6 +168,11 @@ def parse_nessus_file(context, func, *args, **kwargs):
                         host_properties['netbios-name'] = child.text
                 HOST_DATA.append(host_properties.copy())
 
+            # Counting Total IP's seen
+            COUNT_IP_SEEN += 1
+            # Counting Unique IP's seen
+            if host_properties['host-ip'] not in UNIQUE_IP_LIST:
+                UNIQUE_IP_LIST.append(host_properties['host-ip'])
             for child in elem.iter('ReportItem'):
                 # CVE Per Item
                 CVE_ITEM_LIST = list()
@@ -279,6 +300,7 @@ def parse_nessus_file(context, func, *args, **kwargs):
     del context
     return VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS
 
+
 #############################################
 #############################################
 ###################EXCEL#####################
@@ -291,8 +313,8 @@ def generate_worksheets():
         Generate worksheets and store them for later use
     """
     ColorPrint.print_pass("Generating the worksheets")
-    WS_NAMES = ["Overview", "Full Report", "Device Type",
-                "Critical", "High",
+    WS_NAMES = ["Overview", "Graphs", "Full Report",
+                "Device Type", "Critical", "High",
                 "Medium", "Low",
                 "Informational", "MS Running Process Info",
                 "Graph Data"]
@@ -302,6 +324,10 @@ def generate_worksheets():
         ROW_TRACKER[sheet] = 2
         WS = WS_MAPPER[sheet]
         if sheet == "Overview":
+            WS.set_column('A:A', 25)
+            WS.set_column('B:B', 10)
+            continue
+        if sheet == "Graphs":
             continue
         if sheet == "Graph Data":
             WS.write(1, 0, 'Severity', CENTER_BORDER_FORMAT)
@@ -428,6 +454,53 @@ def generate_worksheets():
     WS = None
 
 
+def add_overview_data(DATA):
+    ColorPrint.print_bold("\tInserting data into Overview worksheet")
+    ws = WS_MAPPER['Overview']
+
+    ws.write(2, 0, "Total IP's Scanned")
+    ws.write(2, 1, COUNT_IP_SEEN)
+
+    ws.write(3, 0, "Unique IP's Scanned")
+    ws.write(3, 1, len(UNIQUE_IP_LIST))
+
+    ws.write(5, 0, "Unique Critical Vulnerabilities")
+    ws.write(5, 1, len(COMMON_CRIT))
+
+    ws.write(6, 0, "Unique High Vulnerabilities")
+    ws.write(6, 1, len(COMMON_HIGH))
+
+    ws.write(7, 0, "Unique Medium Vulnerabilities")
+    ws.write(7, 1, len(COMMON_MED))
+
+    ws.write(8, 0, "Unique Low Vulnerabilities")
+    ws.write(8, 1, len(COMMON_LOW))
+
+    ws.write(9, 0, "Unique Informational Vulnerabilities")
+    ws.write(9, 1, len(COMMON_INFO))
+
+    ws.write(11, 0, "Total Critical Vulnerabilities")
+    ws.write(11, 1, DATA["Critical"])
+
+    ws.write(12, 0, "Total High Vulnerabilities")
+    ws.write(12, 1, DATA["High"])
+
+    ws.write(13, 0, "Total Medium Vulnerabilities")
+    ws.write(13, 1, DATA["Medium"])
+
+    ws.write(14, 0, "Total Low Vulnerabilities")
+    ws.write(14, 1, DATA["Low"])
+
+    ws.write(15, 0, "Total Informational Vulnerabilities")
+    ws.write(15, 1, DATA["Informational"])
+
+    ws.write(17, 0, "Most Seen Critical")
+    ws.write(17, 1, max(COMMON_CRIT, key=lambda key: COMMON_CRIT[key]))
+
+    ws.write(18, 0, "Most Seen High")
+    ws.write(18, 1, max(COMMON_HIGH, key=lambda key: COMMON_HIGH[key]))
+
+
 def add_chart_data(DATA):
     ColorPrint.print_warn("\nGenerating Vulnerabilities by Severity graph")
     ws = WS_MAPPER["Graph Data"]
@@ -437,7 +510,7 @@ def add_chart_data(DATA):
         ws.write(temp_cnt, 1, value)
         temp_cnt += 1
     ws.hide()
-    ws = WS_MAPPER["Overview"]
+    ws = WS_MAPPER["Graphs"]
     severity_chart = WB.add_chart({'type': 'pie'})
 
     # Configure Chart Data
@@ -478,7 +551,7 @@ def add_ms_process_info(PROC_INFO, THE_FILE):
             ms_proc_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 4, host[
-                             'netbios-name'], WRAP_TEXT_FORMAT)
+                'netbios-name'], WRAP_TEXT_FORMAT)
             ms_proc_ws.write(temp_cnt, 5, proc, WRAP_TEXT_FORMAT)
             temp_cnt += 1
     ROW_TRACKER['MS Running Process Info'] = temp_cnt
@@ -503,12 +576,28 @@ def add_device_type(DEVICE_INFO, THE_FILE):
 
 def add_vuln_info(VULN_LIST, THE_FILE):
     for key, value in SEVERITIES.items():
-        ColorPrint.print_bold("\tInserting data into {0} worksheet".format(value))
+        ColorPrint.print_bold(
+            "\tInserting data into {0} worksheet".format(value))
         vuln_ws = WS_MAPPER[value]
         temp_cnt = ROW_TRACKER[value]
         for vuln in VULN_LIST:
             if not int(vuln['severity']) == key:
                 continue
+            if int(vuln['severity']) == 4:
+                COMMON_CRIT[vuln['pluginName']] = COMMON_CRIT.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 3:
+                COMMON_HIGH[vuln['pluginName']] = COMMON_HIGH.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 2:
+                COMMON_MED[vuln['pluginName']] = COMMON_MED.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 1:
+                COMMON_LOW[vuln['pluginName']] = COMMON_LOW.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 0:
+                COMMON_INFO[vuln['pluginName']] = COMMON_INFO.get(
+                    vuln['pluginName'], 0) + 1
             SEVERITY_TOTALS[value] += 1
             vuln_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
             vuln_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
@@ -613,7 +702,8 @@ def begin_parsing():
         event, root = next(context)
 
         if root.tag in ["NessusClientData_v2"]:
-            ColorPrint.print_pass("\nBegin parsing of {0}".format(nessus_report))
+            ColorPrint.print_pass(
+                "\nBegin parsing of {0}".format(nessus_report))
             VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
                 context, lambda elem: None)
             add_report_data(VULN_DATA, nessus_report)
@@ -623,6 +713,7 @@ def begin_parsing():
 
         del context
     add_chart_data(SEVERITY_TOTALS)
+    add_overview_data(SEVERITY_TOTALS)
 
 
 if __name__ == "__main__":
