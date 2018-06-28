@@ -2,11 +2,10 @@
 
 import os
 import sys
-import io
 import re
 from datetime import datetime, date
-import lxml.etree as ET
 import argparse
+import lxml.etree as ET
 import xlsxwriter
 
 
@@ -18,13 +17,18 @@ PARSER.add_argument('-o', '--output_file',
 ARGS = PARSER.parse_args()
 
 
-# Track created worksheets and allows for writing on the fly. Intended to
-# minimize memory usage
+# Track created worksheets
 WS_MAPPER = dict()
-
-FILE_MAPPER = list()  # Tracks File to Finding
-
+# Track current used row for worksheets
 ROW_TRACKER = dict()
+
+SINGLE_FIELDS = ['risk_factor', 'vuln_publication_date', 'description',
+                 'plugin_output', 'solution', 'synopsis',
+                 'exploit_available', 'exploitability_ease', 'exploited_by_malware',
+                 'plugin_publication_date', 'plugin_modification_date']
+
+ATTRIB_FIELDS = ['severity', 'pluginFamily', 'pluginID',
+                 'pluginName']
 
 
 def get_child_value(currelem, getchild):
@@ -80,6 +84,18 @@ def parse_nessus_file(context, func, *args, **kwargs):
                 HOST_DATA.append(host_properties.copy())
 
             for child in elem.iter('ReportItem'):
+                # CVE Per Item
+                CVE_ITEM_LIST = list()
+                if child.find("cve") is not None:
+                    for cve in child.iter("cve"):
+                        CVE_ITEM_LIST.append(cve.text)
+
+                # MS Builiten Per Item
+                BID_ITEM_LIST = list()
+                if child.find("bid") is not None:
+                    for bid in child.iter("bid"):
+                        BID_ITEM_LIST.append(bid.text)
+
                 # Process Info
                 if get_attrib_value(child, 'pluginID') in ['70329']:
                     process_properties = host_properties
@@ -95,43 +111,43 @@ def parse_nessus_file(context, func, *args, **kwargs):
                     process_properties['processes'] = process_info
                     MS_PROCESS_INFO.append(process_properties.copy())
 
-                # CPE Info
-                if child.find('cpe') is not None:
-                    cpe_hash = host_properties
-                    cpe_hash['pluginID'] = get_attrib_value(child, 'pluginID')
-                    cpe_hash['cpe'] = get_child_value(child, 'cpe')
-                    cpe_hash['pluginFamily'] = get_attrib_value(
-                        child, 'pluginFamily')
-                    cpe_hash['pluginName'] = get_attrib_value(
-                        child, 'pluginName')
-                    cpe_hash['cpe-source'] = get_attrib_value(child, 'vuln')
+                # # CPE Info
+                # if child.find('cpe') is not None:
+                #     cpe_hash = host_properties
+                #     cpe_hash['pluginID'] = get_attrib_value(child, 'pluginID')
+                #     cpe_hash['cpe'] = get_child_value(child, 'cpe')
+                #     cpe_hash['pluginFamily'] = get_attrib_value(
+                #         child, 'pluginFamily')
+                #     cpe_hash['pluginName'] = get_attrib_value(
+                #         child, 'pluginName')
+                #     cpe_hash['cpe-source'] = get_attrib_value(child, 'vuln')
 
-                    CPE_DATA.append(cpe_hash.copy())
+                #     CPE_DATA.append(cpe_hash.copy())
 
-                # CPE Info
-                if get_attrib_value(child, 'pluginID') in ['45590']:
-                    if get_child_value(child, 'plugin_output') is not None:
-                        cpe_properties = get_child_value(
-                            child, 'plugin_output').split('\n')
-                    else:
-                        cpe_properties = 'None'
+                # # CPE Info
+                # if get_attrib_value(child, 'pluginID') in ['45590']:
+                #     if get_child_value(child, 'plugin_output') is not None:
+                #         cpe_properties = get_child_value(
+                #             child, 'plugin_output').split('\n')
+                #     else:
+                #         cpe_properties = 'None'
 
-                    for cpe_item in cpe_properties:
-                        if re.search('cpe\:\/(o|a|h)', cpe_item):
-                            cpe_item = cpe_item.replace('\s', '')
+                #     for cpe_item in cpe_properties:
+                #         if re.search('cpe\:\/(o|a|h)', cpe_item):
+                #             cpe_item = cpe_item.replace('\s', '')
 
-                            cpe_hash = host_properties
-                            cpe_hash['pluginID'] = get_attrib_value(
-                                child, 'pluginID')
-                            cpe_hash['cpe'] = cpe_item
-                            cpe_hash['pluginFamily'] = get_attrib_value(
-                                child, 'pluginFamily')
-                            cpe_hash['pluginName'] = get_attrib_value(
-                                child, 'pluginName')
-                            cpe_hash[
-                                'cpe-source'] = get_attrib_value(child, 'cpe')
+                #             cpe_hash = host_properties
+                #             cpe_hash['pluginID'] = get_attrib_value(
+                #                 child, 'pluginID')
+                #             cpe_hash['cpe'] = cpe_item
+                #             cpe_hash['pluginFamily'] = get_attrib_value(
+                #                 child, 'pluginFamily')
+                #             cpe_hash['pluginName'] = get_attrib_value(
+                #                 child, 'pluginName')
+                #             cpe_hash[
+                #                 'cpe-source'] = get_attrib_value(child, 'cpe')
 
-                            CPE_DATA.append(cpe_hash.copy())
+                #             CPE_DATA.append(cpe_hash.copy())
 
                 # Device Info
                 if get_attrib_value(child, 'pluginID') in ['54615']:
@@ -170,35 +186,19 @@ def parse_nessus_file(context, func, *args, **kwargs):
                         'plugin-output'] = get_child_value(child, 'plugin-output')
                 # End
 
+                # Begin aggregation of data into vuln_properties
+                # prior to adding to VULN_DATA
                 vuln_properties = host_properties
-                vuln_properties['severity'] = get_attrib_value(
-                    child, 'severity')
-                vuln_properties['risk_factor'] = get_child_value(
-                    child, 'risk_factor')
-                vuln_properties['pluginFamily'] = get_attrib_value(
-                    child, 'pluginFamily')
-                vuln_properties['pluginID'] = get_attrib_value(
-                    child, 'pluginID')
-                vuln_properties['pluginName'] = get_attrib_value(
-                    child, 'pluginName')
-                vuln_properties['vuln_publication_date'] = get_child_value(
-                    child, 'vuln_publication_date')
-                vuln_properties['description'] = get_child_value(
-                    child, 'description')
-                vuln_properties['plugin_output'] = get_child_value(
-                    child, 'plugin_output')
-                vuln_properties['solution'] = get_child_value(
-                    child, 'solution')
-                vuln_properties['synopsis'] = get_child_value(
-                    child, 'synopsis')
-                vuln_properties['exploit_available'] = get_child_value(
-                    child, 'exploit_available')
-                vuln_properties['exploitability_ease'] = get_child_value(
-                    child, 'exploitability_ease')
-                vuln_properties['plugin_publication_date'] = get_child_value(
-                    child, 'plugin_publication_date')
-                vuln_properties['plugin_modification_date'] = get_child_value(
-                    child, 'plugin_modification_date')
+
+                for field in SINGLE_FIELDS:
+                    vuln_properties[field] = get_child_value(
+                        child, field)
+
+                for field in ATTRIB_FIELDS:
+                    vuln_properties[field] = get_attrib_value(
+                        child, field)
+                vuln_properties['bid'] = ";\n".join(CVE_ITEM_LIST)
+                vuln_properties['cve'] = ";\n".join(CVE_ITEM_LIST)
 
                 VULN_DATA.append(vuln_properties.copy())
             HOST_DATA.append(host_properties.copy())
@@ -210,29 +210,6 @@ def parse_nessus_file(context, func, *args, **kwargs):
     del context
     return VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS
 
-
-def gen_severity_data(VULN):
-    CRIT = []
-    HIGH = []
-    MED = []
-    LOW = []
-    INFO = []
-    for vuln in VULN:
-        if not vuln['severity']:
-            continue
-        if int(vuln['severity']) == 4:
-            CRIT.append(vuln.copy())
-        elif int(vuln['severity']) == 3:
-            HIGH.append(vuln.copy())
-        elif int(vuln['severity']) == 2:
-            MED.append(vuln.copy())
-        elif int(vuln['severity']) == 1:
-            LOW.append(vuln.copy())
-        elif int(vuln['severity']) == 0:
-            INFO.append(vuln.copy())
-    return CRIT, HIGH, MED, LOW, INFO
-
-
 #############################################
 #############################################
 ###################EXCEL#####################
@@ -241,6 +218,9 @@ def gen_severity_data(VULN):
 
 
 def generate_worksheets():
+    """
+        Generate worksheets and store them for later use
+    """
     WS_NAMES = ["Full Report", "Device Type",
                 "Critical", "High",
                 "Medium", "Low",
@@ -249,142 +229,6 @@ def generate_worksheets():
         WS_MAPPER[sheet] = WB.add_worksheet(sheet)
         ROW_TRACKER[sheet] = 2
         WS = WS_MAPPER[sheet]
-        if sheet == 'MS Running Process Info':
-            WS.set_tab_color("#9EC3FF")
-
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Process Name & Level', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 35)
-            WS.set_column('E:E', 25)
-            WS.set_column('F:F', 80)
-        if sheet == "Informational":
-            WS.set_tab_color('blue')
-
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 25)
-            WS.set_column('E:E', 10)
-            WS.set_column('F:F', 100)
-            WS.set_column('G:G', 15)
-        if sheet == "Low":
-            WS.set_tab_color('green')
-
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-
-            WS.set_column('D:D', 25)
-            WS.set_column('E:E', 10)
-            WS.set_column('F:F', 100)
-            WS.set_column('G:G', 15)
-        if sheet == "Medium":
-            WS.set_tab_color('yellow')
-
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 25)
-            WS.set_column('E:E', 10)
-            WS.set_column('F:F', 100)
-            WS.set_column('G:G', 15)
-        if sheet == "High":
-            WS.set_tab_color('orange')
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 25)
-            WS.set_column('E:E', 10)
-            WS.set_column('F:F', 100)
-            WS.set_column('G:G', 15)
-        if sheet == "Critical":
-            WS.set_tab_color('red')
-
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 25)
-            WS.set_column('E:E', 10)
-            WS.set_column('F:F', 100)
-            WS.set_column('G:G', 15)
-        if sheet == "Device Type":
-            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            WS.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
-            WS.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
-            WS.write(1, 5, 'Device Type', CENTER_BORDER_FORMAT)
-            WS.write(1, 6, 'Confidence', CENTER_BORDER_FORMAT)
-
-            WS.freeze_panes('C3')
-            WS.autofilter('A2:E2')
-            WS.set_column('A:A', 10)
-            WS.set_column('B:B', 35)
-            WS.set_column('C:C', 15)
-            WS.set_column('D:D', 35)
-            WS.set_column('E:E', 25)
-            WS.set_column('F:F', 15)
-            WS.set_column('G:G', 15)
         if sheet == "Full Report":
             WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
             WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
@@ -405,9 +249,10 @@ def generate_worksheets():
             WS.write(1, 16, 'Exploitability Ease', CENTER_BORDER_FORMAT)
             WS.write(1, 17, 'Plugin Publication Date', CENTER_BORDER_FORMAT)
             WS.write(1, 18, 'Plugin Modification Date', CENTER_BORDER_FORMAT)
+            WS.write(1, 19, 'CVE Information', CENTER_BORDER_FORMAT)
 
             WS.freeze_panes('C3')
-            WS.autofilter('A2:S2')
+            WS.autofilter('A2:T2')
             WS.set_column('A:A', 10)
             WS.set_column('B:B', 35)
             WS.set_column('C:C', 15)
@@ -427,6 +272,77 @@ def generate_worksheets():
             WS.set_column('Q:Q', 25)
             WS.set_column('R:R', 25)
             WS.set_column('S:S', 25)
+            WS.set_column('T:T', 25)
+            continue
+        if sheet == 'MS Running Process Info':
+            WS.set_tab_color("#9EC3FF")
+
+            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
+            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
+            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
+            WS.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
+            WS.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
+            WS.write(1, 5, 'Process Name & Level', CENTER_BORDER_FORMAT)
+
+            WS.freeze_panes('C3')
+            WS.autofilter('A2:E2')
+            WS.set_column('A:A', 10)
+            WS.set_column('B:B', 35)
+            WS.set_column('C:C', 15)
+            WS.set_column('D:D', 35)
+            WS.set_column('E:E', 25)
+            WS.set_column('F:F', 80)
+            continue
+        if sheet == "Device Type":
+            WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
+            WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
+            WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
+            WS.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
+            WS.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
+            WS.write(1, 5, 'Device Type', CENTER_BORDER_FORMAT)
+            WS.write(1, 6, 'Confidence', CENTER_BORDER_FORMAT)
+
+            WS.freeze_panes('C3')
+            WS.autofilter('A2:E2')
+            WS.set_column('A:A', 10)
+            WS.set_column('B:B', 35)
+            WS.set_column('C:C', 15)
+            WS.set_column('D:D', 35)
+            WS.set_column('E:E', 25)
+            WS.set_column('F:F', 15)
+            WS.set_column('G:G', 15)
+            continue
+        if sheet == "Informational":
+            WS.set_tab_color('blue')
+        if sheet == "Low":
+            WS.set_tab_color('green')
+        if sheet == "Medium":
+            WS.set_tab_color('yellow')
+        if sheet == "High":
+            WS.set_tab_color('orange')
+        if sheet == "Critical":
+            WS.set_tab_color('red')
+
+        WS.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
+        WS.write(1, 1, 'File', CENTER_BORDER_FORMAT)
+        WS.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
+        WS.write(1, 3, 'Vuln Publication Date', CENTER_BORDER_FORMAT)
+        WS.write(1, 4, 'Plugin ID', CENTER_BORDER_FORMAT)
+        WS.write(1, 5, 'Plugin Name', CENTER_BORDER_FORMAT)
+        WS.write(1, 6, 'Exploit Avaiable', CENTER_BORDER_FORMAT)
+        WS.write(1, 7, 'CVE Information', CENTER_BORDER_FORMAT)
+
+        WS.freeze_panes('C3')
+        WS.autofilter('A2:E2')
+        WS.set_column('A:A', 10)
+        WS.set_column('B:B', 35)
+        WS.set_column('C:C', 15)
+        WS.set_column('D:D', 25)
+        WS.set_column('E:E', 10)
+        WS.set_column('F:F', 100)
+        WS.set_column('G:G', 15)
+        WS.set_column('H:H', 25)
+
     WS = None
 
 
@@ -476,6 +392,7 @@ def add_crit_info(CRIT, THE_FILE):
         crit_ws.write(temp_cnt, 4, int(crit['pluginID']), WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 5, crit['pluginName'], WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 6, crit['exploit_available'], WRAP_TEXT_FORMAT)
+        crit_ws.write(temp_cnt, 6, crit['cve'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['Critical'] = temp_cnt
 
@@ -494,6 +411,7 @@ def add_high_info(HIGH, THE_FILE):
         high_ws.write(temp_cnt, 4, int(high['pluginID']), WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 5, high['pluginName'], WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 6, high['exploit_available'], WRAP_TEXT_FORMAT)
+        high_ws.write(temp_cnt, 7, high['cve'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['High'] = temp_cnt
 
@@ -512,6 +430,7 @@ def add_med_info(MED, THE_FILE):
         med_ws.write(temp_cnt, 4, int(med['pluginID']), WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 5, med['pluginName'], WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 6, med['exploit_available'], WRAP_TEXT_FORMAT)
+        med_ws.write(temp_cnt, 7, med['cve'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['Medium'] = temp_cnt
 
@@ -530,6 +449,7 @@ def add_low_info(LOW, THE_FILE):
         low_ws.write(temp_cnt, 4, int(low['pluginID']), WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 5, low['pluginName'], WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 6, low['exploit_available'], WRAP_TEXT_FORMAT)
+        low_ws.write(temp_cnt, 7, low['cve'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['Low'] = temp_cnt
 
@@ -548,23 +468,32 @@ def add_info_info(INFO, THE_FILE):
         info_ws.write(temp_cnt, 4, int(info['pluginID']), WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 5, info['pluginName'], WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 6, info['exploit_available'], WRAP_TEXT_FORMAT)
+        info_ws.write(temp_cnt, 7, info['cve'], WRAP_TEXT_FORMAT)
         temp_cnt += 1
     ROW_TRACKER['Informational'] = temp_cnt
 
 
 def add_report_data(REPORT_DATA_LIST, THE_FILE):
+    """
+        Function responsible for inserting data into the Full Report
+        worksheet
+    """
+    # Retrieve correct worksheet from out Worksheet tracker
     report_ws = WS_MAPPER['Full Report']
+    # Resume inserting rows at our last unused row
     temp_cnt = ROW_TRACKER['Full Report']
-
+    # Iterate over out VULN List and insert records to worksheet
     for reportitem in REPORT_DATA_LIST:
+        # If we have a valid Vulnerability publication date
+        # lets generate the Days old cell value
         if reportitem["vuln_publication_date"] != '':
-            date_Format = "%Y/%m/%d"
-            date_One = datetime.strptime(
-                reportitem["vuln_publication_date"], date_Format)
-            date_Two = datetime.strptime(
-                str(date.today()).replace("-", "/"), date_Format)
+            date_format = "%Y/%m/%d"
+            date_one = datetime.strptime(
+                reportitem["vuln_publication_date"], date_format)
+            date_two = datetime.strptime(
+                str(date.today()).replace("-", "/"), date_format)
             report_ws.write(temp_cnt, 5,
-                            (date_Two - date_One).days, NUMBER_FORMAT)
+                            (date_two - date_one).days, NUMBER_FORMAT)
         else:
             report_ws.write(temp_cnt, 5,
                             reportitem["vuln_publication_date"], NUMBER_FORMAT)
@@ -603,8 +532,11 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
             'plugin_publication_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 18, reportitem[
             'plugin_modification_date'], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 19, reportitem[
+            'cve'], WRAP_TEXT_FORMAT)
 
         temp_cnt += 1
+    # Save the last unused row for use on the next Nessus file
     ROW_TRACKER['Full Report'] = temp_cnt
 
 #############################################
@@ -615,25 +547,29 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
 
 
 def begin_parsing():
+    """
+        Provides the initial starting point for validating root tag
+        is for a Nessus v2 File. Initiates parsing and then writes to
+        the associated workbook sheets.
+    """
     for nessus_report in os.listdir(ARGS.launch_directory):
         if nessus_report.endswith(".nessus") or nessus_report.endswith(".xml"):
             curr_file = os.path.join(ARGS.launch_directory, nessus_report)
-            print("Found %s" % nessus_report)
             context = ET.iterparse(curr_file, events=('start', 'end', ))
             context = iter(context)
             event, root = next(context)
 
             if root.tag in "NessusClientData_v2":
+                print("Beginning parsing of {0}".format(nessus_report))
                 VULN_DATA, DEVICE_DATA, CPE_DATA, MS_PROCESS_INFO, PLUGIN_IDS = parse_nessus_file(
                     context, lambda elem: None)
-                C, H, M, L, I = gen_severity_data(VULN_DATA)
-                add_device_type(DEVICE_DATA, curr_file)
                 add_report_data(VULN_DATA, curr_file)
-                add_crit_info(C, curr_file)
-                add_high_info(H, curr_file)
-                add_med_info(M, curr_file)
-                add_low_info(L, curr_file)
-                add_info_info(I, curr_file)
+                add_device_type(DEVICE_DATA, curr_file)
+                add_crit_info(VULN_DATA, curr_file)
+                add_high_info(VULN_DATA, curr_file)
+                add_med_info(VULN_DATA, curr_file)
+                add_low_info(VULN_DATA, curr_file)
+                add_info_info(VULN_DATA, curr_file)
                 add_ms_process_info(MS_PROCESS_INFO, curr_file)
 
             del context
@@ -659,9 +595,9 @@ if __name__ == "__main__":
     CENTER_BORDER_FORMAT = WB.add_format(
         {'bold': True, 'italic': True, 'border': True})
     WRAP_TEXT_FORMAT = WB.add_format(
-        {'bold': False, 'italic': False, 'border': True})
+        {'border': True})
     NUMBER_FORMAT = WB.add_format(
-        {'bold': False, 'italic': False, 'border': True, 'num_format': '0'})
+        {'border': True, 'num_format': '0'})
 
     generate_worksheets()
     begin_parsing()

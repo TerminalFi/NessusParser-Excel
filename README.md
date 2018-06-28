@@ -33,6 +33,12 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Updates
 
+##### Version 0.3.1
+
+ - Code refractoring
+ - Added CVE Information to correlating findings. (Last column of worksheets)
+
+
 ##### Version 0.3
 
  - Optimized Memory Usage (Bug ID: Memory Usage can be calculated pretty accurately. `(Max File Size * 2 + 40)`)
