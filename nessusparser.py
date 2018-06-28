@@ -466,6 +466,8 @@ def add_crit_info(CRIT, THE_FILE):
     crit_ws = WS_MAPPER['Critical']
     temp_cnt = ROW_TRACKER['Critical']
     for crit in CRIT:
+        if not int(crit['severity']) == 4:
+            continue
         crit_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         crit_ws.write(temp_cnt, 2, crit['host-ip'], WRAP_TEXT_FORMAT)
@@ -482,6 +484,8 @@ def add_high_info(HIGH, THE_FILE):
     high_ws = WS_MAPPER['High']
     temp_cnt = ROW_TRACKER['High']
     for high in HIGH:
+        if not int(high['severity']) == 3:
+            continue
         high_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         high_ws.write(temp_cnt, 2, high['host-ip'], WRAP_TEXT_FORMAT)
@@ -498,6 +502,8 @@ def add_med_info(MED, THE_FILE):
     med_ws = WS_MAPPER['Medium']
     temp_cnt = ROW_TRACKER['Medium']
     for med in MED:
+        if not int(med['severity']) == 2:
+            continue
         med_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         med_ws.write(temp_cnt, 2, med['host-ip'], WRAP_TEXT_FORMAT)
@@ -514,6 +520,8 @@ def add_low_info(LOW, THE_FILE):
     low_ws = WS_MAPPER['Low']
     temp_cnt = ROW_TRACKER['Low']
     for low in LOW:
+        if not int(low['severity']) == 1:
+            continue
         low_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         low_ws.write(temp_cnt, 2, low['host-ip'], WRAP_TEXT_FORMAT)
@@ -530,6 +538,8 @@ def add_info_info(INFO, THE_FILE):
     info_ws = WS_MAPPER['Informational']
     temp_cnt = ROW_TRACKER['Informational']
     for info in INFO:
+        if not int(info['severity']) == 0:
+            continue
         info_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 1, THE_FILE, WRAP_TEXT_FORMAT)
         info_ws.write(temp_cnt, 2, info['host-ip'], WRAP_TEXT_FORMAT)
@@ -554,7 +564,7 @@ def add_report_data(REPORT_DATA_LIST, THE_FILE):
             date_Two = datetime.strptime(
                 str(date.today()).replace("-", "/"), date_Format)
             report_ws.write(temp_cnt, 5,
-                            (date_One - date_Two).days, NUMBER_FORMAT)
+                            (date_Two - date_One).days, NUMBER_FORMAT)
         else:
             report_ws.write(temp_cnt, 5,
                             reportitem["vuln_publication_date"], NUMBER_FORMAT)

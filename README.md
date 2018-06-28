@@ -30,6 +30,43 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
  - Ignored Plugin ID's : Ignore ID's that are noisy, pointless, or other reasons
  - And more!
 
+
+#### Updates
+
+##### Version 0.3
+
+ - Optimized Memory Usage (Bug ID: Memory Usage can be calculated pretty accurately. `(Max File Size * 2 + 40)`)
+
+
+##### Version 0.2
+
+ - Added MS Process Infor Tab
+ - Optimized Memory Usage (Bug ID: 1)
+ - Nessus v.2 Support
+ - File to finding mapping
+
+##### Version 0.2
+
+ - Added MS Process Infor Tab
+ - Optimized Memory (Bug ID: 1)
+ - Nessus v.2 Support
+ - File to finding mapping
+
+##### Version 0.1
+
+ - Creation of Full Report, Device Type, Critical, High, Medium, Low, Informational
+ - Multi File Support
+ - Nessus v.2 Support
+ - File to finding mapping
+
+###### Bugs
+
+ - <del>ID 1: High Memory Usage</del>
+
+
+
+
+
 #### Screen
 
 | Full Report |

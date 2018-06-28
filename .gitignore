@@ -3,3 +3,4 @@
 Pipfile.lock
 Pipfile
 .DS_Store
+test.nosync/
