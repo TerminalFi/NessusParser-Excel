@@ -89,7 +89,9 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 | Full Report |
 | ---------------|
-| <img src="./screenshots/Example.png" width="100%"> |
+| <img src="./screenshots/Example1.png" width="100%"> |
+| ---------------|
+| <img src="./screenshots/Example2.png" width="100%"> |
 
 
 ### Pro's vs Con's
