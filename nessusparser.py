@@ -509,55 +509,69 @@ def add_overview_data(sev, seen_ip):
     ColorPrint.print_warn("\nGenerating Overview worksheet")
     active_ws = WS_MAPPER['Overview']
 
-    active_ws.write(2, 0, "Total IP's Scanned")
-    active_ws.write(2, 1, seen_ip)
+    active_ws.write(2, 0, "Total IP's Scanned", LIGHT_FORMAT)
+    active_ws.write(2, 1, seen_ip, NUMBER_FORMAT)
 
-    active_ws.write(3, 0, "Unique IP's Scanned")
-    active_ws.write(3, 1, len(UNIQUE_IP_LIST))
+    active_ws.write(3, 0, "Unique IP's Scanned", LIGHT_FORMAT)
+    active_ws.write(3, 1, len(UNIQUE_IP_LIST), NUMBER_FORMAT)
 
-    active_ws.write(5, 0, "Unique Critical Vulnerabilities")
-    active_ws.write(5, 1, len(COMMON_CRIT))
+    active_ws.write(4, 0, "", SM_DARK_FORMAT)
+    active_ws.write(4, 1, "", SM_DARK_FORMAT)
 
-    active_ws.write(6, 0, "Unique High Vulnerabilities")
-    active_ws.write(6, 1, len(COMMON_HIGH))
+    active_ws.write(5, 0, "Unique Critical Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(5, 1, len(COMMON_CRIT), NUMBER_FORMAT)
 
-    active_ws.write(7, 0, "Unique Medium Vulnerabilities")
-    active_ws.write(7, 1, len(COMMON_MED))
+    active_ws.write(6, 0, "Unique High Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(6, 1, len(COMMON_HIGH), NUMBER_FORMAT)
 
-    active_ws.write(8, 0, "Unique Low Vulnerabilities")
-    active_ws.write(8, 1, len(COMMON_LOW))
+    active_ws.write(7, 0, "Unique Medium Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(7, 1, len(COMMON_MED), NUMBER_FORMAT)
 
-    active_ws.write(9, 0, "Unique Informational Vulnerabilities")
-    active_ws.write(9, 1, len(COMMON_INFO))
+    active_ws.write(8, 0, "Unique Low Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(8, 1, len(COMMON_LOW), NUMBER_FORMAT)
 
-    active_ws.write(11, 0, "Total Critical Vulnerabilities")
-    active_ws.write(11, 1, sev["Critical"])
+    active_ws.write(9, 0, "Unique Informational Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(9, 1, len(COMMON_INFO), NUMBER_FORMAT)
 
-    active_ws.write(12, 0, "Total High Vulnerabilities")
-    active_ws.write(12, 1, sev["High"])
+    active_ws.write(10, 0, "", SM_DARK_FORMAT)
+    active_ws.write(10, 1, "", SM_DARK_FORMAT)
 
-    active_ws.write(13, 0, "Total Medium Vulnerabilities")
-    active_ws.write(13, 1, sev["Medium"])
+    active_ws.write(11, 0, "Total Critical Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(11, 1, sev["Critical"], NUMBER_FORMAT)
 
-    active_ws.write(14, 0, "Total Low Vulnerabilities")
-    active_ws.write(14, 1, sev["Low"])
+    active_ws.write(12, 0, "Total High Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(12, 1, sev["High"], NUMBER_FORMAT)
 
-    active_ws.write(15, 0, "Total Informational Vulnerabilities")
-    active_ws.write(15, 1, sev["Informational"])
+    active_ws.write(13, 0, "Total Medium Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(13, 1, sev["Medium"], NUMBER_FORMAT)
 
-    active_ws.write(17, 0, "Top 5 Seen Critical")
+    active_ws.write(14, 0, "Total Low Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(14, 1, sev["Low"], NUMBER_FORMAT)
+
+    active_ws.write(15, 0, "Total Informational Vulnerabilities", LIGHT_FORMAT)
+    active_ws.write(15, 1, sev["Informational"], NUMBER_FORMAT)
+
+    active_ws.write(16, 0, "", SM_DARK_FORMAT)
+    active_ws.write(16, 1, "", SM_DARK_FORMAT)
+
+    active_ws.write(17, 0, "Top 5 Seen Critical", LIGHT_FORMAT)
     if COMMON_CRIT:
         top_crit = sorted(COMMON_CRIT, key=lambda key:
                           COMMON_CRIT[key], reverse=True)[:5]
         for crit in top_crit:
-            active_ws.write(17 + top_crit.index(crit), 1, crit)
+            active_ws.write(17 + top_crit.index(crit),
+                            1, crit, WRAP_TEXT_FORMAT)
 
-    active_ws.write(23, 0, "Top 5 Seen High")
+    active_ws.write(22, 0, "", SM_DARK_FORMAT)
+    active_ws.write(22, 1, "", SM_DARK_FORMAT)
+
+    active_ws.write(23, 0, "Top 5 Seen High", LIGHT_FORMAT)
     if COMMON_HIGH:
         top_high = sorted(COMMON_HIGH, key=lambda key:
                           COMMON_HIGH[key], reverse=True)[:5]
         for high in top_high:
-            active_ws.write(23 + top_high.index(high), 1, high)
+            active_ws.write(23 + top_high.index(high),
+                            1, high, WRAP_TEXT_FORMAT)
 
 
 def add_chart_data(data):
@@ -830,7 +844,11 @@ if __name__ == "__main__":
     WB = xlsxwriter.Workbook(
         '{0}.xlsx'.format(ARGS.output_file), {'strings_to_urls': False, 'constant_memory': True})
     CENTER_BORDER_FORMAT = WB.add_format(
-        {'bold': True, 'italic': True, 'border': True})
+        {'bg_color': '#1D365A',
+         'font_color': 'white',
+         'bold': True,
+         'italic': True,
+         'border': True})
     WRAP_TEXT_FORMAT = WB.add_format(
         {'border': True})
     NUMBER_FORMAT = WB.add_format(
@@ -843,12 +861,19 @@ if __name__ == "__main__":
          'border': 1,
          'align': 'center',
          'valign': 'vcenter'})
+    SM_DARK_FORMAT = WB.add_format(
+        {'bg_color': '#1D365A',
+         'font_color': 'white',
+         'font_size': 12,
+         'bold': 1,
+         'border': 1})
     LIGHT_FORMAT = WB.add_format(
         {'bg_color': '#9AB3D4',
          'font_color': 'black',
          'font_size': 12,
-         'bold': 1,
-         'border': 1})
+         'border': 1,
+         'align': 'left',
+         'valign': 'top'})
 
     MAX_EXPECTED_MEMORY_USAGE = 0
     for nessus_report in os.listdir(ARGS.launch_directory):
