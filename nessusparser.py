@@ -11,7 +11,7 @@ import lxml.etree as ET
 import xlsxwriter
 
 __author__ = "TheSecEng"
-__website__ = "https:\\\\seceng.io | https:\\\\terminalconnection.io"
+__website__ = "https://seceng.io | https://terminalconnection.io"
 __copyright__ = "Copyright 2018, TheSecEng"
 __credits__ = ["TheSecEng"]
 __license__ = "GPL"
