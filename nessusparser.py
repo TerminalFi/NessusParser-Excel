@@ -101,12 +101,12 @@ TO_BE_PARSED = list()
 WS_MAPPER = dict()
 # Track current used row for worksheets
 ROW_TRACKER = dict()
-
+# Child Elements
 SINGLE_FIELDS = ['risk_factor', 'vuln_publication_date', 'description',
                  'plugin_output', 'solution', 'synopsis',
                  'exploit_available', 'exploitability_ease', 'exploited_by_malware',
                  'plugin_publication_date', 'plugin_modification_date']
-
+# Attribute Fields
 ATTRIB_FIELDS = ['severity', 'pluginFamily', 'pluginID', 'pluginName']
 
 SEVERITIES = {0: "Informational",
@@ -195,16 +195,10 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
             host_properties['host-fqdn'] = ''
             host_properties['netbios-name'] = ''
 
-            cvss_scores = {0: {'cvss_temporal_score': 0,
-                               'cvss_base_score': 0},
-                           1: {'cvss_temporal_score': 0,
-                               'cvss_base_score': 0},
-                           2: {'cvss_temporal_score': 0,
-                               'cvss_base_score': 0},
-                           3: {'cvss_temporal_score': 0,
-                               'cvss_base_score': 0},
-                           4: {'cvss_temporal_score': 0,
-                               'cvss_base_score': 0}}
+            # CVSS Map Generation
+            for i in range(0, 5):
+                cvss_scores[i] = {
+                    'cvss_temporal_score': 0, 'cvss_base_score': 0}
 
             # Building Host Data
             if elem.find('HostProperties') is not None:
@@ -225,18 +219,18 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
 
             # Iter over each item
             for child in elem.iter('ReportItem'):
+                plugin_name = get_attrib_value(child, "pluginName")
+                plugin_id = get_attrib_value(child, "pluginID")
+
                 # Check if we ignore this Plugin ID
-                if get_attrib_value(child, 'pluginID') in IGNORED_IDS:
+                if plugin_id in IGNORED_IDS:
                     continue
                 # Store unique plugin names and occurances
-                if get_attrib_value(child, "pluginName") not in UNIQUE_PLUGIN_NAME:
-                    UNIQUE_PLUGIN_NAME[
-                        get_attrib_value(child,
-                                         "pluginName")] = [get_attrib_value(child, 'pluginID'), 0]
-                UNIQUE_PLUGIN_NAME[get_attrib_value(
-                    child, "pluginName")] = [UNIQUE_PLUGIN_NAME[
-                        get_attrib_value(child, 'pluginName')][0], UNIQUE_PLUGIN_NAME[
-                            get_attrib_value(child, 'pluginName')][1] + 1]
+
+                if plugin_name not in UNIQUE_PLUGIN_NAME:
+                    UNIQUE_PLUGIN_NAME[plugin_name] = [plugin_id, 0]
+                UNIQUE_PLUGIN_NAME[plugin_name] = [UNIQUE_PLUGIN_NAME[plugin_name][0],
+                                                   UNIQUE_PLUGIN_NAME[plugin_name][1] + 1]
 
                 if get_child_value(child, 'cvss_base_score') != '':
                     base_score = round(float(get_child_value(
@@ -264,7 +258,7 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
                         bid_item_list.append(bid.text)
 
                 # Process Info
-                if get_attrib_value(child, 'pluginID') in ['70329']:
+                if plugin_id in ['70329']:
                     process_properties = host_properties
 
                     process_info = get_child_value(child, 'plugin_output')
@@ -317,7 +311,7 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
                 #             CPE_DATA.append(cpe_hash.copy())
 
                 # Device Info
-                if get_attrib_value(child, 'pluginID') in ['54615']:
+                if plugin_id in ['54615']:
                     device_properties = host_properties
 
                     if get_child_value(child, 'plugin_output') is not None:
@@ -340,7 +334,7 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
                 # End
 
                 # WiFi Info
-                if get_attrib_value(child, 'pluginID') in ['11026']:
+                if plugin_id in ['11026']:
                     wifi_properties = host_properties
 
                     wifi_properties['mac_address'] = get_attrib_value(
@@ -463,6 +457,7 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             continue
         if sheet == "CVSS Overview":
             ROW_TRACKER[sheet] = ROW_TRACKER[sheet] + 3
+            active_ws.set_tab_color("#F3E2D3")
             active_ws.write(1, 1, 'Critical', CENTER_BORDER_FORMAT)
             active_ws.write(1, 2, 'High', CENTER_BORDER_FORMAT)
             active_ws.write(1, 3, 'Medium', CENTER_BORDER_FORMAT)
@@ -513,6 +508,7 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.set_column('P:P', 15)
             continue
         if sheet == "Device Type":
+            active_ws.set_tab_color("#BDE1ED")
             active_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
             active_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
             active_ws.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
@@ -551,6 +547,7 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.set_column('F:F', 80)
             continue
         if sheet == "Plugin Counts":
+            active_ws.set_tab_color("#D1B7FF")
             active_ws.autofilter('A2:C2')
             active_ws.set_column('A:A', 85)
             active_ws.set_column('B:B', 15)
@@ -558,6 +555,7 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.write(1, 0, 'Plugin Name', CENTER_BORDER_FORMAT)
             active_ws.write(1, 1, 'Plugin ID', CENTER_BORDER_FORMAT)
             active_ws.write(1, 2, 'Total', CENTER_BORDER_FORMAT)
+            active_ws.freeze_panes('A3')
             continue
         if sheet == "Graph Data":
             active_ws.write(1, 0, 'Severity', CENTER_BORDER_FORMAT)
@@ -778,9 +776,9 @@ def add_report_data(report_data_list, the_file):
         report_ws.write(temp_cnt, 19, reportitem[
             'plugin_modification_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 20, reportitem[
-            'cve'], WRAP_TEXT_FORMAT)
+            'cve'], NUMBER_FORMAT)
         report_ws.write(temp_cnt, 21, reportitem[
-            'bid'], WRAP_TEXT_FORMAT)
+            'bid'], NUMBER_FORMAT)
 
         temp_cnt += 1
     # Save the last unused row for use on the next Nessus file
@@ -920,9 +918,6 @@ def add_plugin_info(plugin_count):
 
 #############################################
 #############################################
-#############################################
-#############################################
-#############################################
 
 
 def begin_parsing():  # pylint: disable=c-extension-no-member
@@ -956,7 +951,7 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
         del context
         curr_iteration += 1
         ColorPrint.print_bold("\n{0}% ({1}/{2}) of files parsed".format(
-            (curr_iteration / len(TO_BE_PARSED)) * 100,
+            round((curr_iteration / len(TO_BE_PARSED)) * 100, 2),
             curr_iteration,
             len(TO_BE_PARSED)))
     add_chart_data(SEVERITY_TOTALS)
@@ -970,14 +965,15 @@ if __name__ == "__main__":
     if ARGS.check_update:
         try:
             import urllib.request
-            url = "https://github.com/TheSecEng/NessusParser-Excel"
-            req = urllib.request.Request(url)
-            resp = urllib.request.urlopen(req)
-            respData = str(resp.read())
-            web_version = re.findall(r'Version\s(\d+\.\d+\.\d+)', str(respData))[0]
-            if __version__ != web_version:
+            URL = "https://github.com/TheSecEng/NessusParser-Excel"
+            REQ = urllib.request.Request(URL)
+            RESP = urllib.request.urlopen(REQ)
+            RESPDATA = str(RESP.read())
+            WEB_VERSION = re.findall(
+                r'Version\s(\d+\.\d+\.\d+)', str(RESPDATA))[0]
+            if __version__ != WEB_VERSION:
                 ColorPrint.print_warn("\nVersion {0} has been released! Get it at {1}".format(
-                    web_version, url))
+                    WEB_VERSION, URL))
             else:
                 ColorPrint.print_warn("\nVersion {0} is the latest version!".format(
                     __version__))
@@ -988,6 +984,7 @@ if __name__ == "__main__":
 
     FILE_COUNT = len([name for name in os.listdir(
         ARGS.launch_directory) if name.endswith('.nessus')])
+    REPORT_NAME = ARGS.output_file
 
     if FILE_COUNT == 0:
         print("No files found")
@@ -1018,7 +1015,6 @@ if __name__ == "__main__":
             ColorPrint.print_fail("Error reading Ignore Plugin Id's fle" +
                                   "please ensure format is on ID per line")
             sys.exit()
-    REPORT_NAME = ARGS.output_file
     if os.path.isfile("{0}.xlsx".format(ARGS.output_file)):
         REPORT_NAME = "{0}_{1}".format(ARGS.output_file, f"{datetime.now():%Y-%m-%d-%S-%s}")
         ColorPrint.print_warn("\nExisting report detected. Report will be saved as {0}.xlsx".format(
