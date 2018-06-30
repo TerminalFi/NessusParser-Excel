@@ -95,7 +95,6 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 | Full Report |
 | ---------------|
 | <img src="./screenshots/Example1.png" width="100%"> |
-| ---------------|
 | <img src="./screenshots/Example2.png" width="100%"> |
 
 
@@ -108,7 +107,6 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Con's
   - Error Checking? What's that! (I have yet to finish this code and wrote it quickly. Didn't implement much of any of this)
-  - Memory usage (My MBP (16GB) handles 2GB worth of Nessus files without hiccup)
  
 
 ### Usage
