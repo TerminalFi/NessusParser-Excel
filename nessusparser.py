@@ -15,7 +15,7 @@ __website__ = "https:\\\\seceng.io | https:\\\\terminalconnection.io"
 __copyright__ = "Copyright 2018, TheSecEng"
 __credits__ = ["TheSecEng"]
 __license__ = "GPL"
-__version__ = "0.3.3"
+__version__ = "0.3.4"
 __maintainer__ = "TheSecEng"
 __email__ = "Nope"
 __status__ = "Development"
@@ -30,9 +30,9 @@ Inspiration from Nessus Parser by Cody (http://www.melcara.com)
 
 Latest Updates
     - Optimized Memory Usage
-    - Memory Usage expectency calculation
-    - Creation of Chart data
-    - Inclusion of BugTraq and CVE ID's
+    - Ignore Plugin ID's from file or switch or both
+    - CVSS Overview sheet added
+    - Plugin Overview sheet added
 """.format(__version__,
            __author__,
            __website__)
@@ -43,6 +43,11 @@ PARSER.add_argument('-l', '--launch_directory',
                     help="Path to Nessus File Directory", required=True)
 PARSER.add_argument('-o', '--output_file',
                     help="Filename to save results as", required=True)
+PARSER.add_argument("-i", "--ignore_id", required=False,
+                    help="Ignored Plugin Id's Ex: 12345,23456,34567")
+PARSER.add_argument("-ig", "--ignore_id_file", required=False,
+                    help="File with Plugin Id's to ignore")
+
 ARGS = PARSER.parse_args()
 
 
@@ -116,6 +121,8 @@ COUNT_UNIQUE_SEVERITIES = {0: 0,
                            2: 0,
                            3: 0,
                            4: 0}
+
+IGNORED_IDS = list()
 UNIQUE_PLUGIN_NAME = dict()
 
 COMMON_CRIT = dict()
@@ -165,12 +172,13 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
     """
         Paring the nessus file and generating information
     """
-    vuln_data = []
-    host_data = []
-    device_data = []
+    vuln_data = list()
+    host_data = list()
+    device_data = list()
     # cpe_data = []
-    ms_process_info = []
-    plugin_ids = []
+    host_cvss = dict()
+    cvss_scores = dict()
+    ms_process_info = list()
     count_ip_seen = 0
     start_tag = None
     for event, elem in context:
@@ -183,6 +191,17 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
             host_properties['host-ip'] = ''
             host_properties['host-fqdn'] = ''
             host_properties['netbios-name'] = ''
+
+            cvss_scores = {0: {'cvss_temporal_score': 0,
+                               'cvss_base_score': 0},
+                           1: {'cvss_temporal_score': 0,
+                               'cvss_base_score': 0},
+                           2: {'cvss_temporal_score': 0,
+                               'cvss_base_score': 0},
+                           3: {'cvss_temporal_score': 0,
+                               'cvss_base_score': 0},
+                           4: {'cvss_temporal_score': 0,
+                               'cvss_base_score': 0}}
 
             # Building Host Data
             if elem.find('HostProperties') is not None:
@@ -203,10 +222,32 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
 
             # Iter over each item
             for child in elem.iter('ReportItem'):
+                # Check if we ignore this Plugin ID
+                if get_attrib_value(child, 'pluginID') in IGNORED_IDS:
+                    continue
                 # Store unique plugin names and occurances
+                if get_attrib_value(child, "pluginName") not in UNIQUE_PLUGIN_NAME:
+                    UNIQUE_PLUGIN_NAME[
+                        get_attrib_value(child,
+                                         "pluginName")] = [get_attrib_value(child, 'pluginID'), 0]
                 UNIQUE_PLUGIN_NAME[get_attrib_value(
-                    child, "pluginName")] = UNIQUE_PLUGIN_NAME.get(
-                        get_attrib_value(child, "pluginName"), 0) + 1
+                    child, "pluginName")] = [UNIQUE_PLUGIN_NAME[
+                        get_attrib_value(child, 'pluginName')][0], UNIQUE_PLUGIN_NAME[
+                            get_attrib_value(child, 'pluginName')][1] + 1]
+
+                if get_child_value(child, 'cvss_base_score') != '':
+                    base_score = round(float(get_child_value(
+                        child, 'cvss_base_score')), 2)
+                    temp_severity = int(get_attrib_value(child, 'severity'))
+                    cvss_scores[temp_severity]['cvss_base_score'] = round(cvss_scores[
+                        temp_severity]['cvss_base_score'] + base_score, 2)
+                if get_child_value(child, 'cvss_temporal_score') != '':
+                    base_score = round(float(get_child_value(
+                        child, 'cvss_temporal_score')), 2)
+                    temp_severity = int(get_attrib_value(child, 'severity'))
+                    cvss_scores[temp_severity]['cvss_temporal_score'] = round(cvss_scores[
+                        temp_severity]['cvss_temporal_score'] + base_score, 2)
+
                 # CVE Per Item
                 cve_item_list = list()
                 if child.find("cve") is not None:
@@ -325,13 +366,14 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
 
                 vuln_data.append(vuln_properties.copy())
             host_data.append(host_properties.copy())
+            host_cvss[host_properties['host-ip']] = cvss_scores
             func(elem, *args, **kwargs)
             elem.clear()
             for ancestor in elem.xpath('ancestor-or-self::*'):
                 while ancestor.getprevious() is not None:
                     del ancestor.getparent()[0]
     del context
-    return vuln_data, device_data, ms_process_info, plugin_ids, count_ip_seen
+    return vuln_data, device_data, ms_process_info, count_ip_seen, host_cvss
 
 
 #############################################
@@ -346,8 +388,8 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
     """
     ColorPrint.print_pass("\nGenerating the worksheets")
     ws_names = ["Overview", "Graphs", "Full Report",
-                "Device Type", "Critical", "High",
-                "Medium", "Low",
+                "CVSS Overview", "Device Type", "Critical",
+                "High", "Medium", "Low",
                 "Informational", "MS Running Process Info",
                 "Plugin Counts", "Graph Data"]
     for sheet in ws_names:
@@ -357,20 +399,10 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
         active_ws = WS_MAPPER[sheet]
         if sheet == "Graphs":
             continue
-        if sheet == "Plugin Counts":
-            active_ws.set_column('A:A', 85)
-            active_ws.set_column('B:B', 15)
-            active_ws.write(1, 0, 'Plugin Name', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 1, 'Total', CENTER_BORDER_FORMAT)
-            continue
         if sheet == "Overview":
             active_ws.set_column('A:A', 28)
             active_ws.set_column('B:B', 70)
             active_ws.merge_range('A1:B2', 'Overview', DARK_FORMAT)
-            continue
-        if sheet == "Graph Data":
-            active_ws.write(1, 0, 'Severity', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 1, 'Total', CENTER_BORDER_FORMAT)
             continue
         if sheet == "Full Report":
             active_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -426,24 +458,56 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.set_column('U:U', 25)
             active_ws.set_column('V:V', 25)
             continue
-        if sheet == 'MS Running Process Info':
-            active_ws.set_tab_color("#9EC3FF")
+        if sheet == "CVSS Overview":
+            ROW_TRACKER[sheet] = ROW_TRACKER[sheet] + 3
+            active_ws.write(1, 1, 'Critical', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 2, 'High', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 3, 'Medium', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 4, 'Low', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 5, 'Informational', CENTER_BORDER_FORMAT)
+            active_ws.write(2, 0, 'Multiplier', CENTER_BORDER_FORMAT)
+            active_ws.write(2, 1, 1, NUMBER_FORMAT)
+            active_ws.write(2, 2, 1, NUMBER_FORMAT)
+            active_ws.write(2, 3, 1, NUMBER_FORMAT)
+            active_ws.write(2, 4, 1, NUMBER_FORMAT)
+            active_ws.write(2, 5, 1, NUMBER_FORMAT)
 
-            active_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 5, 'Process Name & Level', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 0, 'Index', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 1, 'File', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 2, 'IP Address', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 3, 'Total', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 4, 'Base Total', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 5, 'Temporal Total', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 6, 'Base Critical', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 7, 'Temporal Critical', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 8, 'Base High', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 9, 'Temporal High', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 10, 'Base Medium', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 11, 'Temporal Medium', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 12, 'Base Low', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 13, 'Temporal Low', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 14, 'Base Informational', CENTER_BORDER_FORMAT)
+            active_ws.write(4, 15, 'Temporal Informational',
+                            CENTER_BORDER_FORMAT)
 
-            active_ws.freeze_panes('C3')
-            active_ws.autofilter('A2:E2')
+            active_ws.freeze_panes('G6')
+            active_ws.autofilter('A5:P5')
             active_ws.set_column('A:A', 10)
             active_ws.set_column('B:B', 35)
             active_ws.set_column('C:C', 15)
-            active_ws.set_column('D:D', 35)
-            active_ws.set_column('E:E', 25)
-            active_ws.set_column('F:F', 80)
+            active_ws.set_column('D:D', 15)
+            active_ws.set_column('E:E', 15)
+            active_ws.set_column('F:F', 15)
+            active_ws.set_column('G:G', 15)
+            active_ws.set_column('H:H', 15)
+            active_ws.set_column('I:I', 15)
+            active_ws.set_column('J:J', 15)
+            active_ws.set_column('K:K', 15)
+            active_ws.set_column('L:L', 15)
+            active_ws.set_column('M:M', 15)
+            active_ws.set_column('N:N', 15)
+            active_ws.set_column('O:O', 15)
+            active_ws.set_column('P:P', 15)
             continue
         if sheet == "Device Type":
             active_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
@@ -463,6 +527,38 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.set_column('E:E', 25)
             active_ws.set_column('F:F', 15)
             active_ws.set_column('G:G', 15)
+            continue
+        if sheet == 'MS Running Process Info':
+            active_ws.set_tab_color("#9EC3FF")
+
+            active_ws.write(1, 0, 'Index', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 1, 'File', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 2, 'IP Address', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 3, 'FQDN', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 4, 'NetBios Name', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 5, 'Process Name & Level', CENTER_BORDER_FORMAT)
+
+            active_ws.freeze_panes('C3')
+            active_ws.autofilter('A2:E2')
+            active_ws.set_column('A:A', 10)
+            active_ws.set_column('B:B', 35)
+            active_ws.set_column('C:C', 15)
+            active_ws.set_column('D:D', 35)
+            active_ws.set_column('E:E', 25)
+            active_ws.set_column('F:F', 80)
+            continue
+        if sheet == "Plugin Counts":
+            active_ws.autofilter('A2:C2')
+            active_ws.set_column('A:A', 85)
+            active_ws.set_column('B:B', 15)
+            active_ws.set_column('C:C', 15)
+            active_ws.write(1, 0, 'Plugin Name', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 1, 'Plugin ID', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 2, 'Total', CENTER_BORDER_FORMAT)
+            continue
+        if sheet == "Graph Data":
+            active_ws.write(1, 0, 'Severity', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 1, 'Total', CENTER_BORDER_FORMAT)
             continue
         if sheet == "Informational":
             active_ws.set_tab_color('blue')
@@ -617,105 +713,6 @@ def add_chart_data(data):
         'x_offset': 25, 'y_offset': 10})
 
 
-def add_ms_process_info(proc_info, the_file):
-    """
-        Add MS Process information
-    """
-    ColorPrint.print_bold("\tInserting data into MS Process Info worksheet")
-    ms_proc_ws = WS_MAPPER['MS Running Process Info']
-    temp_cnt = ROW_TRACKER['MS Running Process Info']
-    for host in proc_info:
-        for proc in host['processes'].split('\n'):
-            ms_proc_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 4, host[
-                'netbios-name'], WRAP_TEXT_FORMAT)
-            ms_proc_ws.write(temp_cnt, 5, proc, WRAP_TEXT_FORMAT)
-            temp_cnt += 1
-    ROW_TRACKER['MS Running Process Info'] = temp_cnt
-
-
-def add_plugin_info(plugin_count):
-    """
-        Add unique Plugin information
-    """
-    ColorPrint.print_warn("\nGenerating Plugin worksheet")
-    ms_proc_ws = WS_MAPPER['Plugin Counts']
-    temp_cnt = ROW_TRACKER['Plugin Counts']
-    for key, value in plugin_count.items():
-        ms_proc_ws.write(temp_cnt, 0, key, WRAP_TEXT_FORMAT)
-        ms_proc_ws.write(temp_cnt, 1, value, WRAP_TEXT_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Plugin Counts'] = temp_cnt
-
-
-def add_device_type(device_info, the_file):
-    """
-        Add Device Type information
-    """
-    ColorPrint.print_bold("\tInserting data into Device Type worksheet")
-    device_ws = WS_MAPPER['Device Type']
-    temp_cnt = ROW_TRACKER['Device Type']
-    for host in device_info:
-        device_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 5, host['type'], WRAP_TEXT_FORMAT)
-        device_ws.write(temp_cnt, 6, int(
-            host['confidenceLevel']), NUMBER_FORMAT)
-        temp_cnt += 1
-    ROW_TRACKER['Device Type'] = temp_cnt
-
-
-def add_vuln_info(vuln_list, the_file):
-    """
-        Add Vulnerability information
-    """
-    for key, value in SEVERITIES.items():
-        ColorPrint.print_bold(
-            "\tInserting data into {0} worksheet".format(value))
-        vuln_ws = WS_MAPPER[value]
-        temp_cnt = ROW_TRACKER[value]
-        for vuln in vuln_list:
-            if not int(vuln['severity']) == key:
-                continue
-            if int(vuln['severity']) == 4:
-                COMMON_CRIT[vuln['pluginName']] = COMMON_CRIT.get(
-                    vuln['pluginName'], 0) + 1
-            if int(vuln['severity']) == 3:
-                COMMON_HIGH[vuln['pluginName']] = COMMON_HIGH.get(
-                    vuln['pluginName'], 0) + 1
-            if int(vuln['severity']) == 2:
-                COMMON_MED[vuln['pluginName']] = COMMON_MED.get(
-                    vuln['pluginName'], 0) + 1
-            if int(vuln['severity']) == 1:
-                COMMON_LOW[vuln['pluginName']] = COMMON_LOW.get(
-                    vuln['pluginName'], 0) + 1
-            if int(vuln['severity']) == 0:
-                COMMON_INFO[vuln['pluginName']] = COMMON_INFO.get(
-                    vuln['pluginName'], 0) + 1
-            SEVERITY_TOTALS[value] += 1
-            vuln_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 2, vuln['host-ip'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 3, vuln[
-                'vuln_publication_date'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 4, int(vuln['pluginID']), NUMBER_FORMAT)
-            vuln_ws.write(temp_cnt, 5, vuln['pluginName'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 6, vuln[
-                'exploit_available'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 7, vuln[
-                'exploited_by_malware'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 8, vuln['cve'], WRAP_TEXT_FORMAT)
-            vuln_ws.write(temp_cnt, 9, vuln['bid'], WRAP_TEXT_FORMAT)
-            temp_cnt += 1
-        ROW_TRACKER[value] = temp_cnt
-
-
 def add_report_data(report_data_list, the_file):
     """
         Function responsible for inserting data into the Full Report
@@ -786,6 +783,138 @@ def add_report_data(report_data_list, the_file):
     # Save the last unused row for use on the next Nessus file
     ROW_TRACKER['Full Report'] = temp_cnt
 
+
+def add_cvss_info(cvss_data, the_file):
+    """
+        Add unique Plugin information
+    """
+    ColorPrint.print_bold("\tInserting data into CVSS worksheet")
+    active_ws = WS_MAPPER['CVSS Overview']
+    temp_cnt = ROW_TRACKER['CVSS Overview']
+    for key, value in cvss_data.items():
+        active_ws.write(temp_cnt, 0, temp_cnt - 5, WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 2, key, WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 3, "=E{0}+F{1}".format(
+            temp_cnt + 1, temp_cnt + 1), WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 4,
+                        "=(B3*G{0})+(C3*I{1})+(D3*K{2})+(E3*M{3})+(F3*O{4})".format(
+                            temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
+                        WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 5,
+                        "=(B3*H{0})+(C3*J{1})+(D3*L{2})+(E3*N{3})+(F3*P{4})".format(
+                            temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
+                        WRAP_TEXT_FORMAT)
+        temp_col = 6
+        for skey, svalue in value.items():  # pylint: unused-variable
+            for dkey, dvalue in svalue.items():  # pylint: unused-variable
+                active_ws.write(temp_cnt, temp_col, dvalue, NUMBER_FORMAT)
+                temp_col += 1
+
+        temp_cnt += 1
+    ROW_TRACKER['CVSS Overview'] = temp_cnt
+
+
+def add_device_type(device_info, the_file):
+    """
+        Add Device Type information
+    """
+    ColorPrint.print_bold("\tInserting data into Device Type worksheet")
+    device_ws = WS_MAPPER['Device Type']
+    temp_cnt = ROW_TRACKER['Device Type']
+    for host in device_info:
+        device_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 4, host['netbios-name'], WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 5, host['type'], WRAP_TEXT_FORMAT)
+        device_ws.write(temp_cnt, 6, int(
+            host['confidenceLevel']), NUMBER_FORMAT)
+        temp_cnt += 1
+    ROW_TRACKER['Device Type'] = temp_cnt
+
+
+def add_vuln_info(vuln_list, the_file):
+    """
+        Add Vulnerability information
+    """
+    for key, value in SEVERITIES.items():
+        ColorPrint.print_bold(
+            "\tInserting data into {0} worksheet".format(value))
+        vuln_ws = WS_MAPPER[value]
+        temp_cnt = ROW_TRACKER[value]
+        for vuln in vuln_list:
+            if not int(vuln['severity']) == key:
+                continue
+            if int(vuln['severity']) == 4:
+                COMMON_CRIT[vuln['pluginName']] = COMMON_CRIT.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 3:
+                COMMON_HIGH[vuln['pluginName']] = COMMON_HIGH.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 2:
+                COMMON_MED[vuln['pluginName']] = COMMON_MED.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 1:
+                COMMON_LOW[vuln['pluginName']] = COMMON_LOW.get(
+                    vuln['pluginName'], 0) + 1
+            if int(vuln['severity']) == 0:
+                COMMON_INFO[vuln['pluginName']] = COMMON_INFO.get(
+                    vuln['pluginName'], 0) + 1
+            SEVERITY_TOTALS[value] += 1
+            vuln_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 2, vuln['host-ip'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 3, vuln[
+                'vuln_publication_date'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 4, int(vuln['pluginID']), NUMBER_FORMAT)
+            vuln_ws.write(temp_cnt, 5, vuln['pluginName'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 6, vuln[
+                'exploit_available'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 7, vuln[
+                'exploited_by_malware'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 8, vuln['cve'], WRAP_TEXT_FORMAT)
+            vuln_ws.write(temp_cnt, 9, vuln['bid'], WRAP_TEXT_FORMAT)
+            temp_cnt += 1
+        ROW_TRACKER[value] = temp_cnt
+
+
+def add_ms_process_info(proc_info, the_file):
+    """
+        Add MS Process information
+    """
+    ColorPrint.print_bold("\tInserting data into MS Process Info worksheet")
+    ms_proc_ws = WS_MAPPER['MS Running Process Info']
+    temp_cnt = ROW_TRACKER['MS Running Process Info']
+    for host in proc_info:
+        for proc in host['processes'].split('\n'):
+            ms_proc_ws.write(temp_cnt, 0, temp_cnt - 2, WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 1, the_file, WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 2, host['host-ip'], WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 3, host['host-fqdn'], WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 4, host[
+                'netbios-name'], WRAP_TEXT_FORMAT)
+            ms_proc_ws.write(temp_cnt, 5, proc, WRAP_TEXT_FORMAT)
+            temp_cnt += 1
+    ROW_TRACKER['MS Running Process Info'] = temp_cnt
+
+
+def add_plugin_info(plugin_count):
+    """
+        Add unique Plugin information
+    """
+    ColorPrint.print_warn("\nGenerating Plugin worksheet")
+    active_ws = WS_MAPPER['Plugin Counts']
+    temp_cnt = ROW_TRACKER['Plugin Counts']
+    for key, value in plugin_count.items():
+        active_ws.write(temp_cnt, 0, key, WRAP_TEXT_FORMAT)
+        active_ws.write(temp_cnt, 1, int(value[0]), NUMBER_FORMAT)
+        active_ws.write(temp_cnt, 2, int(value[1]), NUMBER_FORMAT)
+        temp_cnt += 1
+    ROW_TRACKER['Plugin Counts'] = temp_cnt
+
+
 #############################################
 #############################################
 #############################################
@@ -800,6 +929,7 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
         the associated workbook sheets.
     """
     count_ip_seen = 0
+    curr_iteration = 0
     for report in TO_BE_PARSED:
         context = ET.iterparse(report, events=('start', 'end', ))
         context = iter(context)
@@ -808,11 +938,12 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
         if root.tag in ["NessusClientData_v2"]:
             ColorPrint.print_pass(
                 "\nBegin parsing of {0}".format(report))
-            vuln_data, device_data, ms_process_info, plugin_ids, seen_ip = parse_nessus_file(
+            vuln_data, device_data, ms_process_info, seen_ip, host_cvss = parse_nessus_file(
                 context, lambda elem: None)
             count_ip_seen += seen_ip
             add_report_data(vuln_data, report)
             add_vuln_info(vuln_data, report)
+            add_cvss_info(host_cvss, report)
             add_device_type(device_data, report)
             add_ms_process_info(ms_process_info, report)
             vuln_data = None
@@ -820,8 +951,13 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
             ms_process_info = None
             seen_ip = None
         del context
-    add_plugin_info(UNIQUE_PLUGIN_NAME)
+        curr_iteration += 1
+        ColorPrint.print_bold("\n{0}% ({1}/{2}) of files parsed".format(
+            (curr_iteration / len(TO_BE_PARSED)) * 100,
+            curr_iteration,
+            len(TO_BE_PARSED)))
     add_chart_data(SEVERITY_TOTALS)
+    add_plugin_info(UNIQUE_PLUGIN_NAME)
     add_overview_data(SEVERITY_TOTALS, count_ip_seen)
 
 
@@ -841,8 +977,33 @@ if __name__ == "__main__":
         if USER_RESPONSE != 'y':
             sys.exit()
 
+    if ARGS.ignore_id:
+        try:
+            for nessus_id in ARGS.ignore_id.split(","):
+                if re.sub(r'\s+', '', nessus_id) not in IGNORED_IDS:
+                    IGNORED_IDS.append(re.sub(r'\s+', '', nessus_id))
+        except:
+            ColorPrint.print_fail("Error reading Ignore Plugin Id's " +
+                                  "please ensure format is: 12345,23455,42342,23423")
+            sys.exit()
+    if ARGS.ignore_id_file:
+        try:
+            with open(ARGS.ignore_id_file) as fp:
+                for cnt, line in enumerate(fp):
+                    if re.sub(r'\s+', '', line) not in IGNORED_IDS:
+                        IGNORED_IDS.append(re.sub(r'\s+', '', line))
+        except:
+            ColorPrint.print_fail("Error reading Ignore Plugin Id's fle" +
+                                  "please ensure format is on ID per line")
+            sys.exit()
+    REPORT_NAME = ARGS.output_file
+    if os.path.isfile("{0}.xlsx".format(ARGS.output_file)):
+        REPORT_NAME = "{0}_{1}".format(ARGS.output_file, f"{datetime.now():%Y-%m-%d-%S-%s}")
+        ColorPrint.print_warn("\nExisting report detected. Report will be saved as {0}.xlsx".format(
+            REPORT_NAME))
+
     WB = xlsxwriter.Workbook(
-        '{0}.xlsx'.format(ARGS.output_file), {'strings_to_urls': False, 'constant_memory': True})
+        '{0}.xlsx'.format(REPORT_NAME), {'strings_to_urls': False, 'constant_memory': True})
     CENTER_BORDER_FORMAT = WB.add_format(
         {'bg_color': '#1D365A',
          'font_color': 'white',
@@ -887,6 +1048,13 @@ if __name__ == "__main__":
 
     ColorPrint.print_warn(
         "\n*** Max expected memory usage {0} MB ***".format(MAX_EXPECTED_MEMORY_USAGE))
+
+    if IGNORED_IDS:
+        ColorPrint.print_warn(
+            "\nIgnoring {0} Plugin ID's".format(len(IGNORED_IDS)))
     generate_worksheets()
     begin_parsing()
     WB.close()
+
+    ColorPrint.print_pass(
+        "\nReport has been saved as {0}.xlsx".format(REPORT_NAME))

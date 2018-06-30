@@ -6,6 +6,7 @@ Python based nessus parser that converts NessusV2 files into formatted XLSX docu
 
   - Multiple file support
   - Formatted XLSX output with worksheets (Full Detail, Device Type, Critical, High, Medium, Low, Informational)
+  - Memory Usage at a minimum
 
 ## Table of Contents
 
@@ -17,8 +18,6 @@ Python based nessus parser that converts NessusV2 files into formatted XLSX docu
   - [Example](#example)
 
 
-
-
 ### Inspiration
 
 Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/archives/253). While this ruby one is still kicking, I prefer python. I hope to eventually emulate all of the features provide by this tool + more
@@ -26,18 +25,24 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Planned Updates
 
- - Charts: Total Vulnerabilities by Severity, Oldest by patch publication date, Top Offenders
- - Ignored Plugin ID's : Ignore ID's that are noisy, pointless, or other reasons
- - And more!
+ - Charts
+ - Looking for ideas 
 
 
 #### Updates
 
+##### Version 0.3.4
+
+ - CVSS Overview sheet added
+ - Plugin Overview sheet added (Can be used to identify unwanted plugins to be used with ignore feature)
+ - Ignore Plugin ID's 
+ - Overwrite file protection (If an existing report is identified, automatically append Year-Month-Day-Seconds-Miliseconds)
+
 ##### Version 0.3.3
 
- - Memory Optimization
- - Max memory usage expectency calculation
- - Overview sheet includes Pie chart of Vuln Count by Severities
+- Memory Optimization
+- Max memory usage expectency calculation
+- Overview sheet includes Pie chart of Vuln Count by Severities
 
 ##### Version 0.3.2
 
@@ -114,7 +119,18 @@ pip install pipenv
 pipenv install
 pipenv shell
 
+General Usage
 python nessusparser.py -l FOLDER_WITH_FILES -o OUTPUT_DIRECTORY/FILENAME
+
+Ignore plugin ID's
+python nessusparser.py -l FOLDER_WITH_FILES -o OUTPUT_DIRECTORY/FILENAME -i 25423,23432,54353,34534
+
+Ignore Plugin ID's from file (One plugin ID per line)
+python nessusparser.py -l FOLDER_WITH_FILES -o OUTPUT_DIRECTORY/FILENAME -ig FILE_WITH_PLUGIN_IDS
+
+Ignore common plugin ids from file + report specific plugin ids
+python nessusparser.py -l FOLDER_WITH_FILES -o OUTPUT_DIRECTORY/FILENAME -ig FILE_WITH_PLUGIN_IDS -i 23432,234234,234234
+
 ```
 
 #### Example
