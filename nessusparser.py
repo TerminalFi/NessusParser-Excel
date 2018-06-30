@@ -39,6 +39,9 @@ Latest Updates
 
 
 PARSER = argparse.ArgumentParser(description='Parse Nessus Files')
+PARSER.add_argument("-u", "--check_update", required=False,
+                    action="store_true",
+                    help="Check for new version")
 PARSER.add_argument('-l', '--launch_directory',
                     help="Path to Nessus File Directory", required=True)
 PARSER.add_argument('-o', '--output_file',
@@ -963,6 +966,25 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
 
 if __name__ == "__main__":
     ColorPrint.print_bold(SCRIPT_INFO)
+
+    if ARGS.check_update:
+        try:
+            import urllib.request
+            url = "https://github.com/TheSecEng/NessusParser-Excel"
+            req = urllib.request.Request(url)
+            resp = urllib.request.urlopen(req)
+            respData = str(resp.read())
+            web_version = re.findall(r'Version\s(\d+\.\d+\.\d+)', str(respData))[0]
+            if __version__ != web_version:
+                ColorPrint.print_warn("\nVersion {0} has been released! Get it at {1}".format(
+                    web_version, url))
+            else:
+                ColorPrint.print_warn("\nVersion {0} is the latest version!".format(
+                    __version__))
+        except:
+            ColorPrint.print_fail("\nFailed checking for update")
+        finally:
+            sys.exit()
 
     FILE_COUNT = len([name for name in os.listdir(
         ARGS.launch_directory) if name.endswith('.nessus')])
