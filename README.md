@@ -63,7 +63,7 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 ##### Version 0.3
 
- - Optimized Memory Usage (Bug ID: Memory Usage can be calculated pretty accurately. `(Max File Size * 2 + 40)`)
+ - Optimized Memory Usage (Bug ID: Memory Usage )
 
 
 ##### Version 0.2
