@@ -11,11 +11,11 @@ import lxml.etree as ET
 import xlsxwriter
 
 __author__ = "TheSecEng"
-__website__ = "https://seceng.io | https://terminalconnection.io"
+__website__ = "https://terminalconnection.io"
 __copyright__ = "Copyright 2018, TheSecEng"
 __credits__ = ["TheSecEng"]
 __license__ = "GPL"
-__version__ = "0.3.5"
+__version__ = "0.3.6"
 __maintainer__ = "TheSecEng"
 __email__ = "Nope"
 __status__ = "Development"
@@ -29,6 +29,7 @@ Created and maintained by {1} ({2})
 Inspiration from Nessus Parser by Cody (http://www.melcara.com)
 
 Latest Updates
+	- Fixed some formatting
     - Optimized Memory Usage
     - Ignore Plugin ID's from file or switch or both
     - CVSS Overview sheet added
@@ -372,12 +373,7 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
     del context
     return vuln_data, device_data, ms_process_info, count_ip_seen, host_cvss
 
-
-#############################################
-#############################################
 ###################EXCEL#####################
-#############################################
-#############################################
 
 def generate_worksheets():  # pylint: disable=too-many-statements, too-many-branches, line-too-long
     """
@@ -989,8 +985,7 @@ if __name__ == "__main__":
     if FILE_COUNT == 0:
         print("No files found")
         sys.exit()
-
-    if FILE_COUNT > 25:
+    elif FILE_COUNT > 25:
         USER_RESPONSE = input(
             '\x1b[1;33mFolder contains 25+ Nessus files. Continue? [y/n]: \x1b[0m')[0].lower()
         if USER_RESPONSE != 'y':
