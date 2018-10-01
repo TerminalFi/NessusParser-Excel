@@ -32,6 +32,10 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 #### Updates
 
+##### Version 0.3.6
+
+ - Nothing major
+
 ##### Version 0.3.5
 
  - Simple Update Checker `python3 nessusparser.py -u` or `python3 nessusparser.py --check-update`
