@@ -29,20 +29,17 @@ Created and maintained by {1} ({2})
 Inspiration from Nessus Parser by Cody (http://www.melcara.com)
 
 Latest Updates
-	- Fixed some formatting
-    - Optimized Memory Usage
-    - Ignore Plugin ID's from file or switch or both
-    - CVSS Overview sheet added
-    - Plugin Overview sheet added
+\t- Fixed some formatting
+\t- Optimized Memory Usage
+\t- Ignore Plugin ID's from file or switch or both
+\t- CVSS Overview sheet added
+\t- Plugin Overview sheet added
 """.format(__version__,
            __author__,
            __website__)
 
 
 PARSER = argparse.ArgumentParser(description='Parse Nessus Files')
-PARSER.add_argument("-u", "--check_update", required=False,
-                    action="store_true",
-                    help="Check for new version")
 PARSER.add_argument('-l', '--launch_directory',
                     help="Path to Nessus File Directory", required=True)
 PARSER.add_argument('-o', '--output_file',
@@ -226,8 +223,8 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
                 # Check if we ignore this Plugin ID
                 if plugin_id in IGNORED_IDS:
                     continue
-                # Store unique plugin names and occurances
 
+                # Store unique plugin names and occurances
                 if plugin_name not in UNIQUE_PLUGIN_NAME:
                     UNIQUE_PLUGIN_NAME[plugin_name] = [plugin_id, 0]
                 UNIQUE_PLUGIN_NAME[plugin_name] = [UNIQUE_PLUGIN_NAME[plugin_name][0],
@@ -359,6 +356,7 @@ def parse_nessus_file(context, func, *args, **kwargs):  # pylint: disable=too-ma
                 for field in ATTRIB_FIELDS:
                     vuln_properties[field] = get_attrib_value(
                         child, field)
+                vuln_properties['port'] = get_attrib_value(child, "port")
                 vuln_properties['bid'] = ";\n".join(bid_item_list)
                 vuln_properties['cve'] = ";\n".join(cve_item_list)
 
@@ -410,20 +408,21 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.write(1, 8, 'Plugin ID', CENTER_BORDER_FORMAT)
             active_ws.write(1, 9, 'Plugin Family', CENTER_BORDER_FORMAT)
             active_ws.write(1, 10, 'Plugin Name', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 11, 'Description', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 12, 'Synopsis', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 13, 'Plugin Output', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 14, 'Solution', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 15, 'Exploit Available', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 16, 'Exploitability Ease', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 17, 'Exploited by Malware',
+            active_ws.write(1, 11, 'Port', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 12, 'Description', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 13, 'Synopsis', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 14, 'Plugin Output', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 15, 'Solution', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 16, 'Exploit Available', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 17, 'Exploitability Ease', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 18, 'Exploited by Malware',
                             CENTER_BORDER_FORMAT)
-            active_ws.write(1, 18, 'Plugin Publication Date',
+            active_ws.write(1, 19, 'Plugin Publication Date',
                             CENTER_BORDER_FORMAT)
-            active_ws.write(1, 19, 'Plugin Modification Date',
+            active_ws.write(1, 20, 'Plugin Modification Date',
                             CENTER_BORDER_FORMAT)
-            active_ws.write(1, 20, 'CVE Information', CENTER_BORDER_FORMAT)
-            active_ws.write(1, 21, 'Bugtraq ID Information',
+            active_ws.write(1, 21, 'CVE Information', CENTER_BORDER_FORMAT)
+            active_ws.write(1, 22, 'Bugtraq ID Information',
                             CENTER_BORDER_FORMAT)
 
             active_ws.freeze_panes('C3')
@@ -450,6 +449,7 @@ def generate_worksheets():  # pylint: disable=too-many-statements, too-many-bran
             active_ws.set_column('T:T', 25)
             active_ws.set_column('U:U', 25)
             active_ws.set_column('V:V', 25)
+            active_ws.set_column('W:W', 25)
             continue
         if sheet == "CVSS Overview":
             ROW_TRACKER[sheet] = ROW_TRACKER[sheet] + 3
@@ -753,27 +753,29 @@ def add_report_data(report_data_list, the_file):
             "pluginFamily"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 10, reportitem[
             "pluginName"], WRAP_TEXT_FORMAT)
-        report_ws.write(temp_cnt, 11, reportitem[
-            "description"], WRAP_TEXT_FORMAT)
+        report_ws.write(temp_cnt, 11, int(reportitem[
+            "port"]), NUMBER_FORMAT)
         report_ws.write(temp_cnt, 12, reportitem[
-            'synopsis'], WRAP_TEXT_FORMAT)
+            "description"], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 13, reportitem[
-            'plugin_output'], WRAP_TEXT_FORMAT)
+            'synopsis'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 14, reportitem[
-            'solution'], WRAP_TEXT_FORMAT)
+            'plugin_output'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 15, reportitem[
-            'exploit_available'], WRAP_TEXT_FORMAT)
+            'solution'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 16, reportitem[
-            'exploitability_ease'], WRAP_TEXT_FORMAT)
+            'exploit_available'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 17, reportitem[
-            'exploited_by_malware'], WRAP_TEXT_FORMAT)
+            'exploitability_ease'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 18, reportitem[
-            'plugin_publication_date'], WRAP_TEXT_FORMAT)
+            'exploited_by_malware'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 19, reportitem[
-            'plugin_modification_date'], WRAP_TEXT_FORMAT)
+            'plugin_publication_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 20, reportitem[
-            'cve'], NUMBER_FORMAT)
+            'plugin_modification_date'], WRAP_TEXT_FORMAT)
         report_ws.write(temp_cnt, 21, reportitem[
+            'cve'], NUMBER_FORMAT)
+        report_ws.write(temp_cnt, 22, reportitem[
             'bid'], NUMBER_FORMAT)
 
         temp_cnt += 1
@@ -957,26 +959,6 @@ def begin_parsing():  # pylint: disable=c-extension-no-member
 
 if __name__ == "__main__":
     ColorPrint.print_bold(SCRIPT_INFO)
-
-    if ARGS.check_update:
-        try:
-            import urllib.request
-            URL = "https://github.com/TheSecEng/NessusParser-Excel"
-            REQ = urllib.request.Request(URL)
-            RESP = urllib.request.urlopen(REQ)
-            RESPDATA = str(RESP.read())
-            WEB_VERSION = re.findall(
-                r'Version\s(\d+\.\d+\.\d+)', str(RESPDATA))[0]
-            if __version__ != WEB_VERSION:
-                ColorPrint.print_warn("\nVersion {0} has been released! Get it at {1}".format(
-                    WEB_VERSION, URL))
-            else:
-                ColorPrint.print_warn("\nVersion {0} is the latest version!".format(
-                    __version__))
-        except:
-            ColorPrint.print_fail("\nFailed checking for update")
-        finally:
-            sys.exit()
 
     FILE_COUNT = len([name for name in os.listdir(
         ARGS.launch_directory) if name.endswith('.nessus')])
