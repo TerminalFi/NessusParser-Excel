@@ -34,7 +34,7 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 ##### Version 0.3.6
 
- - Nothing major
+ - Remove Update Function
 
 ##### Version 0.3.5
 

@@ -29,6 +29,7 @@ Created and maintained by {1} ({2})
 Inspiration from Nessus Parser by Cody (http://www.melcara.com)
 
 Latest Updates
+\t- Remove Update Function
 \t- Fixed some formatting
 \t- Optimized Memory Usage
 \t- Ignore Plugin ID's from file or switch or both
