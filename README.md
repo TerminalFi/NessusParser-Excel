@@ -1,4 +1,4 @@
-### Coded with focus on python 3 (Working on support python 2 now)
+### Now supports Python 2 and 3. Thanks to [Slad3G](https://github.com/Slad3G) for pointing out the issue.
 
 # NessusParser
 
