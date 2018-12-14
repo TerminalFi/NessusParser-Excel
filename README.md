@@ -1,3 +1,5 @@
+### Coded with focus on python 3 (Working on support python 2 now)
+
 # NessusParser
 
 Python based nessus parser that converts NessusV2 files into formatted XLSX documents.
