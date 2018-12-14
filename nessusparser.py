@@ -997,7 +997,7 @@ if __name__ == "__main__":
                                   "please ensure format is on ID per line")
             sys.exit()
     if os.path.isfile("{0}.xlsx".format(ARGS.output_file)):
-        REPORT_NAME = "{0}_{1}".format(ARGS.output_file, f"{datetime.now():%Y-%m-%d-%S-%s}")
+        REPORT_NAME = "{0}_{1}".format(ARGS.output_file, f("{datetime.now():%Y-%m-%d-%S-%s}"))
         ColorPrint.print_warn("\nExisting report detected. Report will be saved as {0}.xlsx".format(
             REPORT_NAME))
 
