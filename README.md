@@ -39,7 +39,7 @@ Inspiration of this came from [Nessus Parser - Cody](http://www.melcara.com/arch
 
 ##### Version 0.3.5
 
- - Simple Update Checker `python3 nessusparser.py -u` or `python3 nessusparser.py --check-update`
+ <del> - Simple Update Checker `python3 nessusparser.py -u` or `python3 nessusparser.py --check-update` </del>
 
 ##### Version 0.3.4
 
