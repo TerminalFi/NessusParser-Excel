@@ -824,11 +824,11 @@ def add_cvss_info(cvss_data, the_file):
         active_ws.write(temp_cnt, 3, "=E{0}+F{1}".format(
             temp_cnt + 1, temp_cnt + 1), WRAP_TEXT_FORMAT)
         active_ws.write(temp_cnt, 4,
-                        "=(B3*G{0})+(C3*I{1})+(D3*K{2})+(E3*M{3})+(F3*O{4})".format(
+                        "=($B$3*G{0})+($C$3*I{1})+($D$3*K{2})+($E$3*M{3})+($F$3*O{4})".format(
                             temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
                         WRAP_TEXT_FORMAT)
         active_ws.write(temp_cnt, 5,
-                        "=(B3*H{0})+(C3*J{1})+(D3*L{2})+(E3*N{3})+(F3*P{4})".format(
+                        "=($B$3*H{0})+($C$3*J{1})+($D$3*L{2})+($E$3*N{3})+($F$3*P{4})".format(
                             temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
                         WRAP_TEXT_FORMAT)
         temp_col = 6
