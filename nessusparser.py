@@ -831,11 +831,11 @@ def add_cvss_info(cvss_data, the_file):
                         "=($B$3*H{0})+($C$3*J{1})+($D$3*L{2})+($E$3*N{3})+($F$3*P{4})".format(
                             temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
                         WRAP_TEXT_FORMAT)
-        temp_col = 6
+        temp_col = 6+9
         for skey, svalue in value.items():  # pylint: unused-variable
             for dkey, dvalue in svalue.items():  # pylint: unused-variable
                 active_ws.write(temp_cnt, temp_col, dvalue, NUMBER_FORMAT)
-                temp_col += 1
+                temp_col -= 1
 
         temp_cnt += 1
     ROW_TRACKER['CVSS Overview'] = temp_cnt
