@@ -824,18 +824,18 @@ def add_cvss_info(cvss_data, the_file):
         active_ws.write(temp_cnt, 3, "=E{0}+F{1}".format(
             temp_cnt + 1, temp_cnt + 1), WRAP_TEXT_FORMAT)
         active_ws.write(temp_cnt, 4,
-                        "=(B3*G{0})+(C3*I{1})+(D3*K{2})+(E3*M{3})+(F3*O{4})".format(
+                        "=($B$3*G{0})+($C$3*I{1})+($D$3*K{2})+($E$3*M{3})+($F$3*O{4})".format(
                             temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
                         WRAP_TEXT_FORMAT)
         active_ws.write(temp_cnt, 5,
-                        "=(B3*H{0})+(C3*J{1})+(D3*L{2})+(E3*N{3})+(F3*P{4})".format(
+                        "=($B$3*H{0})+($C$3*J{1})+($D$3*L{2})+($E$3*N{3})+($F$3*P{4})".format(
                             temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1, temp_cnt + 1),
                         WRAP_TEXT_FORMAT)
-        temp_col = 6
+        temp_col = 6+9
         for skey, svalue in value.items():  # pylint: unused-variable
             for dkey, dvalue in svalue.items():  # pylint: unused-variable
                 active_ws.write(temp_cnt, temp_col, dvalue, NUMBER_FORMAT)
-                temp_col += 1
+                temp_col -= 1
 
         temp_cnt += 1
     ROW_TRACKER['CVSS Overview'] = temp_cnt
@@ -1021,7 +1021,7 @@ if __name__ == "__main__":
                                   "please ensure format is on ID per line")
             sys.exit()
     if os.path.isfile("{0}.xlsx".format(ARGS.output_file)):
-        REPORT_NAME = "{0}_{1}".format(ARGS.output_file, f("{datetime.now():%Y-%m-%d-%S-%s}"))
+        REPORT_NAME = "{0}_{1}".format(ARGS.output_file, datetime.today().strftime('%Y-%m-%d_%H-%M-%S-%f')[:-3])
         ColorPrint.print_warn("\nExisting report detected. Report will be saved as {0}.xlsx".format(
             REPORT_NAME))
 
